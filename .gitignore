@@ -1,0 +1,10 @@
+__pycache__
+sechat/__pycache__
+.replit
+replit.nix
+poetry.lock
+.config
+venv
+*.py
+*.sh
+docs/build
