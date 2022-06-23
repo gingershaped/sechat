@@ -4,3 +4,5 @@
 A _better_ Stack Exchange Chat library.
 
 [Documentation!](https://sechat.readthedocs.io/en/latest/)
+
+Install from pypi using `pip install sechat`.
