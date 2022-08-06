@@ -547,12 +547,12 @@ class Bot:
         :raises sechat.errors.FutureError: If the bot can't get an fkey from the openID login page
         :raises sechat.errors.LoginError: If the login fails
     '''
-    _COOKIEPATH = gettempdir() + "/sechat_cookies_" + sha256(email.encode("utf-8")).hexdigest() + ".dat"
+    self._COOKIEPATH = gettempdir() + "/sechat_cookies_" + sha256(email.encode("utf-8")).hexdigest() + ".dat"
     if self.useCookies:
       l = logging.getLogger("CookieManager")
       l.debug("Loading cookies...")
       try:
-        f = open(_COOKIEPATH, "rb")
+        f = open(self._COOKIEPATH, "rb")
       except FileNotFoundError:
         l.debug("No cookies found")
       else:
@@ -626,7 +626,7 @@ class Bot:
       if self.useCookies:
         l = logging.getLogger("CookieManager")
         l.debug("Dumping cookies...")
-        with open(_COOKIEPATH, "wb") as f:
+        with open(self._COOKIEPATH, "wb") as f:
           pickle.dump(self.session.cookies, f)
         l.debug("Success!")
     self.logger.debug("Getting chat fkey...")
@@ -710,6 +710,6 @@ class Bot:
     if self.useCookies:
       l = logging.getLogger("CookieManager")
       l.debug("Clearing cookies...")
-      os.remove(_COOKIEPATH)
+      os.remove(self._COOKIEPATH)
       l.debug("Done!")
     self.logger.info("Logged out successfully.")
