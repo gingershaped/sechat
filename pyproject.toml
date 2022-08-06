@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sechat"
-version = "1.0.0"
+version = "1.0.1"
 description = "A BETTER Stack Exchange chat library."
 authors = ["Ginger"]
 
