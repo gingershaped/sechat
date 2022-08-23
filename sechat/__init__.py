@@ -120,7 +120,7 @@ class Room:
         data = self.socket.recv()
       except websocket.WebSocketTimeoutException:
         continue
-      except websocket.WebSocketConnectionClosedException:
+      except (websocket.WebSocketConnectionClosedException, ConnectionResetError):
         self.logger.warning("Connection closed, attempting to reconnect")
         self.connect()
       except Exception as e:
@@ -637,7 +637,6 @@ class Bot:
       "html.parser"
     )
     self.fkey = r.find(id="content").form.find("input", attrs={"name": "fkey"})["value"]
-    print(r.find(class_="topbar-menu-links").find("a")["href"].split("/")[2])
     try:
       self.userID = int(r.find(class_="topbar-menu-links").find("a")["href"].split("/")[2])
     except ValueError:
