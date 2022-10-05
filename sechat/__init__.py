@@ -129,7 +129,7 @@ class Room:
       if data is not None and data != "":
         try:
           data = json.loads(data)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError, TypeError:
           self.logger.warning("Recived corrupted data: " + data)
         else:
           self.lastPing = time.time()
