@@ -17,7 +17,7 @@ from hashlib import sha256
 '''A BETTER Stack Exchange chat module.'''
 
 class Room:
-  def __init__(self, parent, roomID, logRequestErrors = False):
+  def __init__(self, parent, roomID, logRequestErrors = False, autoConnect = True):
     '''A room which the bot is in. You should never create this classs by hand!'''
     self.session = parent.session
     self.fkey = parent.fkey
@@ -37,7 +37,8 @@ class Room:
     }
     self.lastPing = 0
 
-    self.connect()
+    if autoConnect:
+      self.connect()
 
   def __del__(self):
     self.halt()
@@ -63,9 +64,10 @@ class Room:
           "fkey": self.fkey,
           "roomid": self.roomID
         }
-      ).json()
+      )
+      r = r.json()
     except Exception as e:
-      raise errors.ConnectionError("Unable to authenticate") from e
+      raise errors.ConnectionError("Unable to authenticate: " + str(r.content)) from e
     target = r["url"]+"?l={}".format(int(time.time()))
     try:
       self.socket = websocket.create_connection(target, origin="http://chat.stackexchange.com", timeout = 2)
@@ -124,12 +126,23 @@ class Room:
         self.logger.warning("Connection closed, attempting to reconnect")
         self.connect()
       except Exception as e:
+        self.logger.info("Shutting down...")
+        self.socket.close()
+        self.session.post(
+          "https://chat.stackexchange.com/chats/leave/"
+          + str(self.roomID),
+          data = {
+            "quiet": True,
+            "fkey": self.fkey
+          }
+        )
+        self.running = False
         self.logger.critical("Unexpected error")
         raise errors.ConnectionError from e
       if data is not None and data != "":
         try:
           data = json.loads(data)
-        except json.JSONDecodeError, TypeError:
+        except (json.JSONDecodeError, TypeError):
           self.logger.warning("Recived corrupted data: " + data)
         else:
           self.lastPing = time.time()
@@ -230,6 +243,7 @@ class Room:
       else:
         raise errors.TooFastError
     elif r.text.startswith("It is too late"):
+      self.cooldown = 2
       return False
     else:
       self.cooldown = 2
@@ -563,6 +577,7 @@ class Bot:
         else:
           l.debug("Success!")
           self.session.cookies.clear_expired_cookies()
+        f.close()
     if not "acct" in dict(self.session.cookies):
       self.logger.info("Logging in to " + host)
       self.logger.debug("Getting fkey...")
@@ -646,24 +661,28 @@ class Bot:
     self.logger.debug("Got chat fkey: " + self.fkey)
     self.logger.info("Logged in to chat successfully!")
 
-  def joinRoom(self, roomID):
+  def joinRoom(self, roomID, autoConnect = True):
     '''Join a room.
 
         :param roomID: The ID of the room to join.
-        :type roomID: str
+        :type roomID: int
 
         :return: The room instance.
         :rtype: sechat.Room
     '''
-    room = Room(self, roomID)
+    print(self.rooms)
+    if roomID in self.rooms:
+      return self.rooms[roomID]
+    room = Room(self, roomID, autoConnect=autoConnect)
     self.rooms[roomID] = room
+    print(self.rooms)
     return room
 
   def leaveRoom(self, roomID, wait = False):
     '''Leave a room. The behavior of the corresponding Room instance afer this message is called is undefined.
 
         :param roomID: The room ID to leave.
-        :type roomID: str
+        :type roomID: int
         :param wait: If True, sechat guarantees that the room's thread will be stopped when the method returns.
         :type wait: bool
 
@@ -677,7 +696,7 @@ class Bot:
       self.rooms[roomID].halt(wait)
       self.rooms.pop(roomID)
     except KeyError:
-      raise ValueError("Not in room " + roomID) from None
+      raise ValueError("Not in room " + str(roomID)) from None
 
   def leaveAllRooms(self, wait = False):
     '''Leave all rooms. Works the same as leaveRoom but for all rooms.
@@ -711,4 +730,7 @@ class Bot:
       l.debug("Clearing cookies...")
       os.remove(self._COOKIEPATH)
       l.debug("Done!")
+    self.fkey = None
+    self.chatID = None
+    self.userID = None
     self.logger.info("Logged out successfully.")
