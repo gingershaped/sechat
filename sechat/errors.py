@@ -23,3 +23,6 @@ class TooFastError(RoomError):
 
 class NotAllowedError(RoomError):
   '''Used when you try to do something you're not allowed to do'''
+
+class OperationFailedError(RoomError):
+    '''Used when an operation fails (SEChat doesn't return "ok")'''

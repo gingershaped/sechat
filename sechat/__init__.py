@@ -235,7 +235,7 @@ class Room:
       if self.logRequestErrors:
         self.logger.exception("An error occured in function " + repr(func))
       return
-    if r.text.startswith("You can perform this action again"):
+    if r.status_code == 409:
       if handleTooFast:
         time.sleep(self.cooldown)
         self.cooldown = self.cooldown ** 2
@@ -244,7 +244,7 @@ class Room:
         raise errors.TooFastError
     elif r.text.startswith("It is too late"):
       self.cooldown = 2
-      return False
+      raise errors.TimeoutError
     else:
       self.cooldown = 2
       return r
@@ -307,8 +307,8 @@ class Room:
       :return: The ID of the message that was just sent.
       :rtype: int
     '''
-    self.logger.info("Sending message: " + message)
-    return self.processTooFast(
+    self.logger.info("Sending message: " + message) 
+    r = self.processTooFast(
         lambda: self.session.post(
           "https://chat.stackexchange.com/chats/{}/messages/new"
             .format(self.roomID),
@@ -323,7 +323,11 @@ class Room:
           }  
       ),
       handleTooFast
-    ).json()["id"]
+    )
+    try:
+      return r.json()["id"]
+    except Exception as e:
+      raise errors.OperationFailedError("Failed to send message", r.content) from e
   def buildReply(self, target, message):
     '''Convenience function for making a reply.
 
@@ -350,7 +354,7 @@ class Room:
       "Editing message {0} to: {1}"
         .format(target, newMessage)
     )
-    self.processTooFast(
+    r = self.processTooFast(
       lambda: self.session.post(
         "https://chat.stackexchange.com/messages/{}"
           .format(target),
@@ -364,7 +368,9 @@ class Room:
         }
       ),
       handleTooFast
-    )
+    ).text
+    if r != "ok":
+        raise errors.OperationFailedError("Failed to edit message", r.content)
   def delete(self, id, handleTooFast = True):
     '''Delete a message.
 
