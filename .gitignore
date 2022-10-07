@@ -5,7 +5,7 @@ replit.nix
 poetry.lock
 .config
 venv
-*.py
+./*.py
 *.sh
 docs/build
 dist/
