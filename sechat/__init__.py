@@ -16,11 +16,12 @@ from hashlib import sha256
 
 '''A BETTER Stack Exchange chat module.'''
 
+
 class Room:
+  '''A room which the bot is in. You should never create this classs by hand!'''
   def __init__(self, parent, roomID, logRequestErrors = False, autoConnect = True):
-    '''A room which the bot is in. You should never create this classs by hand!'''
     self.session = parent.session
-    self.fkey = parent.fkey
+    self._fkey = parent.fkey
     self.userID = parent.userID
     self.roomID = roomID
     self.logRequestErrors = logRequestErrors
@@ -30,7 +31,7 @@ class Room:
     self.thread = None
     self.socket = None
     self.running = False
-    self.handlers = {}
+    self.handlers = {i:set() for i in Events}
     self.internalHandlers = {
       Events.REPLY.value: self._replyHandler,
       Events.MENTION.value: self._replyHandler
@@ -182,36 +183,41 @@ class Room:
       :param callback: The callback function. Gets a namedtuple with all the event data as its only parameter.
       :type callback: function
 
-      :raises ValueError: If there is an event handler already registered for that event type or the event type is unknown.
+      :raises ValueError: If the event type is unknown.
     '''
     if event in Events:
       if event.value not in self.handlers:
-        self.handlers[event.value] = callback
+        self.handlers[event.value].add(callback)
       else:
         raise ValueError("Handler already registered for event " + Events(event).name)
     else:
       raise ValueError("Unknown event type: " + str(event))
 
-  def off(self, event):
+  def off(self, listener):
     '''Remove an event listener.
 
-      :param event: The event type of the handler to remove.
-      :type event: sechat.events.EventType
+      :param listener: The function to remove.
+      :type listener: function
     '''
-    if event in Events:
-      if event.value in self.handlers:
-        self.handlers.pop(event.value)
-      else:
-        raise ValueError("No handler for event " + Events(event).name)
+    toRemove = None
+    for handlers in self.handlers:
+      for handler in handlers:
+        if handler == listener:
+          toRemove = handlers
+          break
+    if toRemove is not None:
+      toRemove.remove(listener)
     else:
-      raise ValueError("Unknown event type: " + str(event))
+      raise ValueError("Listener not registered")
+          
 
   def handle(self, event, data, default = None):
     if event in self.internalHandlers:
       self.internalHandlers[event](data)
     if event in self.handlers:
       t = namedtuple("Event", data.keys())
-      self.handlers[event](t(**data))
+      for h in self.handlers[event]:
+        h(t(**data))
     elif default:
       default(data)
 
@@ -235,7 +241,7 @@ class Room:
       if self.logRequestErrors:
         self.logger.exception("An error occured in function " + repr(func))
       return
-    if r.status_code == 409:
+    if r.text.startswith("You can perform"):
       if handleTooFast:
         time.sleep(self.cooldown)
         self.cooldown = self.cooldown ** 2
@@ -368,9 +374,9 @@ class Room:
         }
       ),
       handleTooFast
-    ).text
-    if r != "ok":
-        raise errors.OperationFailedError("Failed to edit message", r.content)
+    )
+    if r.text != "ok":
+      raise errors.OperationFailedError("Failed to edit message", r.content)
   def delete(self, id, handleTooFast = True):
     '''Delete a message.
 
@@ -383,7 +389,7 @@ class Room:
       "Deleting message {}"
         .format(id)
     )
-    self.processTooFast(
+    r = self.processTooFast(
       lambda: self.session.post(
         "https://chat.stackexchange.com/messages/{}/delete"
           .format(id),
@@ -397,8 +403,10 @@ class Room:
       ),
       handleTooFast
     )
+    if r.text != "ok":
+      raise errors.OperationFailedError("Failed to delete message", r.content)
   def star(self, id, handleTooFast = True):
-    '''Star a message.
+    '''Toggle the starred status of a message.
 
         :param id: The message ID to star.
         :type id: int
@@ -409,7 +417,7 @@ class Room:
       "Starring {0}"
         .format(id)
     )
-    self.processTooFast(
+    r = self.processTooFast(
       lambda: self.session.post(
         "https://chat.stackexchange.com/messages/{}/star"
           .format(id),
@@ -423,6 +431,8 @@ class Room:
       ),
       handleTooFast
     )
+    if r.text != "ok":
+      raise errors.OperationFailedError("Failed to star message", r.content)
   def pin(self, id, handleTooFast = True):
     '''Pin a message.
 
@@ -435,7 +445,7 @@ class Room:
       "Pinning {0}"
         .format(id)
     )
-    self.processTooFast(
+    r = self.processTooFast(
       lambda: self.session.post(
         "https://chat.stackexchange.com/messages/{}/owner-star"
           .format(id),
@@ -449,6 +459,8 @@ class Room:
       ),
       handleTooFast
     )
+    if r.text != "ok":
+      raise errors.OperationFailedError("Failed to pin message", r.content)
   def unpin(self, id, handleTooFast = True):
     '''Unpin a message.
 
@@ -461,7 +473,7 @@ class Room:
       "Unpinning {0}"
         .format(id)
     )
-    self.processTooFast(
+    r = self.processTooFast(
       lambda: self.session.post(
         "https://chat.stackexchange.com/messages/{}/unowner-star"
           .format(id),
@@ -475,6 +487,8 @@ class Room:
       ),
       handleTooFast
     )
+    if r.text != "ok":
+      raise errors.OperationFailedError("Failed to unpin message", r.content)
   def clearStars(self, id, handleTooFast = True):
     '''Clear stars on a message.
 
@@ -487,7 +501,7 @@ class Room:
       "Clearing stars on {0}"
         .format(id)
     )
-    self.processTooFast(
+    r = self.processTooFast(
       lambda: self.session.post(
         "https://chat.stackexchange.com/messages/{}/unstar"
           .format(id),
@@ -501,6 +515,8 @@ class Room:
       ),
       handleTooFast
     )
+    if r.text != "ok":
+      raise errors.OperationFailedError("Failed to clear stars on message", r.content)
   def move(self, ids, target):
     '''Move a group of messages.
 
@@ -546,6 +562,7 @@ class Bot:
     self.logger = logger if logger else logging.getLogger("Bot")
     
     self.session = requests.Session()
+    self.session.headers.update({"User-Agent": "Mozilla/5.0 (compatible; automated;) sechat/1.0.2 (unauthenticated; +http://pypi.org/project/sechat)"})
     self.fkey = None
     self.chatID = None
     self.userID = None
@@ -666,6 +683,7 @@ class Bot:
       ) from None
     self.logger.debug("Got chat fkey: " + self.fkey)
     self.logger.info("Logged in to chat successfully!")
+    self.session.headers.update({"User-Agent": "Mozilla/5.0 (compatible; automated;) sechat/1.0.2 (logged in as user %s; +http://pypi.org/project/sechat)" % self.userID})
 
   def joinRoom(self, roomID, autoConnect = True):
     '''Join a room.
