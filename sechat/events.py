@@ -29,3 +29,4 @@ class Events(enum.Enum):
 
   SECHAT_ERROR = -1
   SECHAT_CONN_CLOSE = -2
+
