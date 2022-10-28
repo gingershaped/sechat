@@ -2,9 +2,11 @@ __pycache__
 sechat/__pycache__
 .replit
 replit.nix
+.breakpoints
+.cache/
 poetry.lock
-.config
-venv
+.config/
+venv/
 ./*.py
 *.sh
 docs/build
