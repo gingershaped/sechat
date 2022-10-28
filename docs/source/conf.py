@@ -12,17 +12,21 @@
 #
 import os
 import sys
+import tomli
 sys.path.insert(0, os.path.abspath('../../'))
+
+with open("../../pyproject.toml", "rb") as f:
+    config = tomli.load(f)["tool"]["poetry"]
 
 
 # -- Project information -----------------------------------------------------
 
-project = 'sechat'
+project = config["name"]
 copyright = '2022, GingerIndustries'
-author = 'GingerIndustries'
+author = config["authors"][0]
 
 # The full version, including alpha/beta/rc tags
-release = '1.0.0'
+release = config["version"]
 
 
 # -- General configuration ---------------------------------------------------
