@@ -74,7 +74,6 @@ class T01RoomTestCase(unittest.TestCase):
         self.assertEqual(messages[3], "Cooldown check 3")
         self.assertEqual(messages[5], "After edit")
         self.assertFalse(messages[6])
-        self.room.send("Checks passed")
         
 
 @unittest.skipIf(EMAIL2 is None, "Don't have two bots to test this with")
@@ -85,15 +84,19 @@ class T02MultiUserTestCase(unittest.TestCase):
         cls.room = bot.joinRoom(1)
         cls.room2 = bot2.joinRoom(1)
         cls.gotMessage = False
+        cls.gotReply = False
     @classmethod
     def tearDownClass(cls):
+        bot2.leaveAllRooms()
         cls.room.send("Stage 2 complete. DO NOT resume sending messages.")
         sleep(2)
-        bot2.leaveAllRooms()
 
     def onMessage(self, event):
         if event.content == "Test message":
             self.gotMessage = True
+    def onReply(self, event):
+        self.gotReply = True
+        print(event)
     
     def test00Starring(self):
         ident = self.room.send("This message will be starred")
@@ -107,13 +110,40 @@ class T02MultiUserTestCase(unittest.TestCase):
         self.room.on(Events.MESSAGE, self.onMessage)
         self.room2.send("Test message")
         sleep(2)
-        self.room.off(Events.MESSAGE)
+        self.room.off(self.onMessage)
         self.assertTrue(self.gotMessage)
-            
+    def test02ReplyEvents(self):
+        self.room.on(Events.REPLY, self.onReply)
+        ident = self.room.send("Test message")
+        self.room2.send(self.room2.buildReply(ident, "Test reply"))
+        sleep(2)
+        self.room.off(self.onReply)
+        self.assertTrue(self.gotReply)
         
 
 class T03ROTestCase(unittest.TestCase):
-    pass
+    @classmethod
+    def setUpClass(cls):
+        cls.room = bot.joinRoom(1, False)
+        cls.ident = None
+    @classmethod
+    def tearDownClass(cls):
+        sleep(2)
+    def test00PinMessages(self):
+        self.ident = self.room.send("This message will be pinned")
+        sleep(2)
+        self.room.pin(self.ident)
+        sleep(2)
+        self.room.unpin(self.ident)
+        sleep(2)
+        self.room.send("Clearing stars on message")
+        self.room.clearStars(self.ident)
+    @unittest.skip("No privs yet")
+    def test02MoveMessages(self):
+        ident = self.room.send("This message will be moved to https://chat.stackexchange.com/rooms/120733/osp-testing")
+        sleep(2)
+        self.room.move([ident], 120733)
+        
 
 class T04LeaveTestCase(unittest.TestCase):
     @classmethod
@@ -130,7 +160,7 @@ class T04LeaveTestCase(unittest.TestCase):
     def test02LeaveAllRooms(self):
         bot.leaveAllRooms(True)
 
-    @unittest.skip("currently developing, no captcha")
+    @unittest.skip("Don't want to trigger the captcha")
     def test03Logout(self):
         bot.logout()
         self.assertIsNone(bot.fkey)
