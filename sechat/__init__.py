@@ -125,8 +125,6 @@ class Room:
         continue
       except (websocket.WebSocketConnectionClosedException, ConnectionResetError):
         self.logger.warning("Connection closed, attempting to reconnect")
-        self.socket.close()
-        time.sleep(2)
         self.connect()
       except Exception as e:
         self.logger.info("Shutting down...")
