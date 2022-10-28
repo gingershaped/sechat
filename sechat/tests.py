@@ -110,14 +110,14 @@ class T02MultiUserTestCase(unittest.TestCase):
         self.room.on(Events.MESSAGE, self.onMessage)
         self.room2.send("Test message")
         sleep(2)
-        self.room.off(Events.MESSAGE)
+        self.room.off(self.onMessage)
         self.assertTrue(self.gotMessage)
     def test02ReplyEvents(self):
-        self.room2.on(Events.REPLY, self.onReply)
+        self.room.on(Events.REPLY, self.onReply)
         ident = self.room.send("Test message")
         self.room2.send(self.room2.buildReply(ident, "Test reply"))
         sleep(2)
-        self.room2.off(Events.REPLY)
+        self.room.off(self.onReply)
         self.assertTrue(self.gotReply)
         
 
@@ -136,10 +136,8 @@ class T03ROTestCase(unittest.TestCase):
         sleep(2)
         self.room.unpin(self.ident)
         sleep(2)
-    def test01ClearStars(self):
         self.room.send("Clearing stars on message")
         self.room.clearStars(self.ident)
-        sleep(2)
     @unittest.skip("No privs yet")
     def test02MoveMessages(self):
         ident = self.room.send("This message will be moved to https://chat.stackexchange.com/rooms/120733/osp-testing")

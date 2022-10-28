@@ -1,4 +1,4 @@
-import websocket
+import websocket #upm package(websocket-client)
 import threading
 import time
 import requests
@@ -31,7 +31,7 @@ class Room:
     self.thread = None
     self.socket = None
     self.running = False
-    self.handlers = {i:set() for i in Events}
+    self.handlers = {i.value: set() for i in Events}
     self.internalHandlers = {
       Events.REPLY.value: self._replyHandler,
       Events.MENTION.value: self._replyHandler
@@ -62,7 +62,7 @@ class Room:
       r = self.session.post(
         "https://chat.stackexchange.com/ws-auth",
         data = {
-          "fkey": self.fkey,
+          "fkey": self._fkey,
           "roomid": self.roomID
         }
       )
@@ -101,7 +101,7 @@ class Room:
           "since": since,
           "mode": mode,
           "count": count,
-          "fkey": self.fkey
+          "fkey": self._fkey
         },
         headers = {
           'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -136,7 +136,7 @@ class Room:
           + str(self.roomID),
           data = {
             "quiet": True,
-            "fkey": self.fkey
+            "fkey": self._fkey
           }
         )
         self.running = False
@@ -160,7 +160,7 @@ class Room:
       + str(self.roomID),
       data = {
         "quiet": True,
-        "fkey": self.fkey
+        "fkey": self._fkey
       }
     )
     self.socket.close()
@@ -188,10 +188,7 @@ class Room:
       :raises ValueError: If the event type is unknown.
     '''
     if event in Events:
-      if event.value not in self.handlers:
         self.handlers[event.value].add(callback)
-      else:
-        raise ValueError("Handler already registered for event " + Events(event).name)
     else:
       raise ValueError("Unknown event type: " + str(event))
 
@@ -203,12 +200,12 @@ class Room:
     '''
     toRemove = None
     for handlers in self.handlers:
-      for handler in handlers:
+      for handler in self.handlers[handlers]:
         if handler == listener:
           toRemove = handlers
           break
     if toRemove is not None:
-      toRemove.remove(listener)
+      self.handlers[toRemove].remove(listener)
     else:
       raise ValueError("Listener not registered")
           
@@ -231,7 +228,7 @@ class Room:
       "https://chat.stackexchange.com/messages/ack",
       data = {
         "id": event["message_id"],
-        "fkey": self.fkey
+        "fkey": self._fkey
       }
     )
 
@@ -278,7 +275,7 @@ class Room:
         "firstMessageId": start,
         "lastMessageId": end,
         "title": title,
-        "fkey": self.fkey
+        "fkey": self._fkey
       },
       headers = {
         'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -300,7 +297,7 @@ class Room:
       "https://chat.stackexchange.com/conversation/delete/{0}/{1}"
       .format(self.roomID, title),
       data = {
-        "fkey": self.fkey
+        "fkey": self._fkey
       }
     )
       
@@ -321,7 +318,7 @@ class Room:
           "https://chat.stackexchange.com/chats/{}/messages/new"
             .format(self.roomID),
           data = {
-            "fkey": self.fkey,
+            "fkey": self._fkey,
             "text": message
           },
           headers = {
@@ -368,7 +365,7 @@ class Room:
           .format(target),
         data = {
           "text": newMessage,
-          "fkey": self.fkey
+          "fkey": self._fkey
         },
         headers = {
           'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -377,7 +374,7 @@ class Room:
       ),
       handleTooFast
     )
-    if r.text != "ok":
+    if r.text != '"ok"':
       raise errors.OperationFailedError("Failed to edit message", r.content)
   def delete(self, id, handleTooFast = True):
     '''Delete a message.
@@ -396,7 +393,7 @@ class Room:
         "https://chat.stackexchange.com/messages/{}/delete"
           .format(id),
         data = {
-          "fkey": self.fkey
+          "fkey": self._fkey
         },
         headers = {
           'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -405,7 +402,7 @@ class Room:
       ),
       handleTooFast
     )
-    if r.text != "ok":
+    if r.text != '"ok"':
       raise errors.OperationFailedError("Failed to delete message", r.content)
   def star(self, id, handleTooFast = True):
     '''Toggle the starred status of a message.
@@ -424,7 +421,7 @@ class Room:
         "https://chat.stackexchange.com/messages/{}/star"
           .format(id),
         data = {
-          "fkey": self.fkey
+          "fkey": self._fkey
         },
         headers = {
           'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -433,7 +430,7 @@ class Room:
       ),
       handleTooFast
     )
-    if r.text != "ok":
+    if r.text != '"ok"':
       raise errors.OperationFailedError("Failed to star message", r.content)
   def pin(self, id, handleTooFast = True):
     '''Pin a message.
@@ -452,7 +449,7 @@ class Room:
         "https://chat.stackexchange.com/messages/{}/owner-star"
           .format(id),
         data = {
-          "fkey": self.fkey
+          "fkey": self._fkey
         },
         headers = {
           'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -461,7 +458,7 @@ class Room:
       ),
       handleTooFast
     )
-    if r.text != "ok":
+    if r.text != '"ok"':
       raise errors.OperationFailedError("Failed to pin message", r.content)
   def unpin(self, id, handleTooFast = True):
     '''Unpin a message.
@@ -480,7 +477,7 @@ class Room:
         "https://chat.stackexchange.com/messages/{}/unowner-star"
           .format(id),
         data = {
-          "fkey": self.fkey
+          "fkey": self._fkey
         },
         headers = {
           'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -489,7 +486,7 @@ class Room:
       ),
       handleTooFast
     )
-    if r.text != "ok":
+    if r.text != '"ok"':
       raise errors.OperationFailedError("Failed to unpin message", r.content)
   def clearStars(self, id, handleTooFast = True):
     '''Clear stars on a message.
@@ -508,7 +505,7 @@ class Room:
         "https://chat.stackexchange.com/messages/{}/unstar"
           .format(id),
         data = {
-          "fkey": self.fkey
+          "fkey": self._fkey
         },
         headers = {
           'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -517,7 +514,7 @@ class Room:
       ),
       handleTooFast
     )
-    if r.text != "ok":
+    if r.text != '"ok"':
       raise errors.OperationFailedError("Failed to clear stars on message", r.content)
   def move(self, ids, target):
     '''Move a group of messages.
@@ -542,7 +539,7 @@ class Room:
       data = {
         "ids": ",".join([str(i) for i in ids]),
         "to": target,
-        "fkey": self.fkey
+        "fkey": self._fkey
       },
       headers = {
         'Referer': 'https://chat.stackexchange.com/rooms/{}'
@@ -696,12 +693,10 @@ class Bot:
         :return: The room instance.
         :rtype: sechat.Room
     '''
-    print(self.rooms)
     if roomID in self.rooms:
       return self.rooms[roomID]
     room = Room(self, roomID, autoConnect=autoConnect)
     self.rooms[roomID] = room
-    print(self.rooms)
     return room
 
   def leaveRoom(self, roomID, wait = False):
