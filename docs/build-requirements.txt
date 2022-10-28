@@ -1,0 +1,2 @@
+# This file lists dependencies needed by readthedocs to build the documentation
+tomli == 2.0.1

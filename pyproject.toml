@@ -16,6 +16,10 @@ Sphinx = "^5.0.2"
 sphinx-rtd-theme = "^1.0.0"
 build = "^0.8.0"
 
+[tool.poetry.group.dev.dependencies]
+# Remember to update docs/build-requirements.txt!
+tomli = "^2.0.1" 
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
