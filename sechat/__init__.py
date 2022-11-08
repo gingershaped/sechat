@@ -605,14 +605,15 @@ class Bot:
       self.logger.debug("Getting fkey...")
       fkey = BeautifulSoup(
         self.session.get(
-          "https://openid.stackexchange.com/account/login"
+          "https://meta.stackexchange.com/users/login"
         ).text,
         "html.parser"
-      ).form.find(attrs={"name": "fkey"})["value"]
+      ).find(attrs={"name": "fkey"})
       if fkey == None:
         raise errors.FutureError(
           "Unable to extract fkey from login page, are you using this in the future?"
         )
+      fkey = fkey["value"]
       self.logger.debug("Got fkey: " + fkey)
       self.logger.debug("Logging in to Stack Exchange...")
       r = self.session.post(
