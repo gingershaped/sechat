@@ -183,7 +183,7 @@ class Room:
     '''Add an event listener.
 
       :param event: The event to listen for.
-      :type event: sechat.events.EventType
+      :type event: sechat.events.Events
       :param callback: The callback function. Gets a namedtuple with all the event data as its only parameter.
       :type callback: function
 
