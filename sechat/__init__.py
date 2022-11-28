@@ -165,6 +165,8 @@ class Room:
     )
     self.socket.close()
 
+    
+
   def process(self, data):
     if "r" + str(self.roomID) in data:
       data = data["r" + str(self.roomID)]
@@ -181,7 +183,7 @@ class Room:
     '''Add an event listener.
 
       :param event: The event to listen for.
-      :type event: sechat.events.EventType
+      :type event: sechat.events.Events
       :param callback: The callback function. Gets a namedtuple with all the event data as its only parameter.
       :type callback: function
 
@@ -234,12 +236,7 @@ class Room:
 
 
   def processTooFast(self, func, handleTooFast):
-    try:
-      r = func()
-    except Exception as e:
-      if self.logRequestErrors:
-        self.logger.exception("An error occured in function " + repr(func))
-      return
+    r = func()
     if r.text.startswith("You can perform"):
       if handleTooFast:
         time.sleep(self.cooldown)
