@@ -10,7 +10,7 @@ import atexit
 from tempfile import gettempdir
 from bs4 import BeautifulSoup
 from . import errors
-from .events import Events
+from .events import EventType
 from collections import namedtuple
 from hashlib import sha256
 
@@ -31,10 +31,10 @@ class Room:
     self.thread = None
     self.socket = None
     self.running = False
-    self.handlers = {i.value: set() for i in Events}
+    self.handlers = {i.value: set() for i in EventType}
     self.internalHandlers = {
-      Events.REPLY.value: self._replyHandler,
-      Events.MENTION.value: self._replyHandler
+      EventType.REPLY.value: self._replyHandler,
+      EventType.MENTION.value: self._replyHandler
     }
     self.lastPing = 0
 
@@ -177,7 +177,7 @@ class Room:
             try:
               self.handle(event["event_type"], event)
             except:
-              self.handle(Events.SECHAT_ERROR, event["event_type"], self._defaultOnHandlerErrorHandler)
+              self.handle(EventType.SECHAT_ERROR, event["event_type"], self._defaultOnHandlerErrorHandler)
 
   def on(self, event, callback):
     '''Add an event listener.
@@ -189,7 +189,7 @@ class Room:
 
       :raises ValueError: If the event type is unknown.
     '''
-    if event in Events:
+    if event in EventType:
         self.handlers[event.value].add(callback)
     else:
       raise ValueError("Unknown event type: " + str(event))
@@ -223,7 +223,7 @@ class Room:
       default(data)
 
   def _defaultOnHandlerErrorHandler(self, event):
-    self.logger.exception("An error occured in the handler for event " + Events(event).name)
+    self.logger.exception("An error occured in the handler for event " + EventType(event).name)
 
   def _replyHandler(self, event):
     self.session.post(

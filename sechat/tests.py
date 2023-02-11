@@ -2,7 +2,7 @@ import unittest
 import os
 import sechat
 from time import sleep
-from sechat.events import Events
+from sechat.events import EventType
 
 bot = None
 bot2 = None
@@ -107,13 +107,13 @@ class T02MultiUserTestCase(unittest.TestCase):
         self.room2.star(ident)
         sleep(4)
     def test01MessageEvents(self):
-        self.room.on(Events.MESSAGE, self.onMessage)
+        self.room.on(EventType.MESSAGE, self.onMessage)
         self.room2.send("Test message")
         sleep(2)
         self.room.off(self.onMessage)
         self.assertTrue(self.gotMessage)
     def test02ReplyEvents(self):
-        self.room.on(Events.REPLY, self.onReply)
+        self.room.on(EventType.REPLY, self.onReply)
         ident = self.room.send("Test message")
         self.room2.send(self.room2.buildReply(ident, "Test reply"))
         sleep(2)
