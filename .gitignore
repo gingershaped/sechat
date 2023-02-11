@@ -6,7 +6,7 @@ replit.nix
 .cache/
 .config/
 venv/
-*.py
+./*.py
 *.sh
 docs/build
 dist/
