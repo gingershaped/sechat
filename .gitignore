@@ -4,10 +4,10 @@ sechat/__pycache__
 replit.nix
 .breakpoints
 .cache/
-poetry.lock
 .config/
 venv/
 *.py
 *.sh
 docs/build
 dist/
+.vscode/
