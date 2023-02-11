@@ -1,4 +1,4 @@
-from typing import Optional, Any, Union
+from typing import Optional, Any, TypeVar, Generic
 from collections.abc import Callable, Coroutine
 from time import time
 from logging import Logger, getLogger
@@ -10,10 +10,13 @@ import json
 from websockets.client import connect
 from aiohttp import ClientSession
 
-from sechat.events import EventBase, MentionEvent, EventType, EVENT_CLASSES
+from sechat.events import EventBase, MentionEvent, EventType, EventTypeMember, EVENT_CLASSES
 
-EventHandler = Callable[[EventBase], Coroutine]
 
+
+
+ET = TypeVar("ET", bound = EventBase, contravariant=True)
+EventHandler = Callable[[ET], Coroutine]
 
 class Room:
     def __init__(
@@ -36,7 +39,7 @@ class Room:
         self.handlers: dict[EventType, set[EventHandler]] = {
             eventType: set() for eventType in EventType
         }
-        self.handlers[EventType.MENTION].add(self._mentionHandler)
+        self.register(self._mentionHandler, EventType.MENTION)
 
     async def _mentionHandler(self, event: MentionEvent):
         await self.session.post(
@@ -84,8 +87,8 @@ class Room:
             )
         )
 
-    
-    def register(self, handler: EventHandler, eventType: EventType):
+    T = TypeVar("T", bound = EventTypeMember)
+    def register(self, handler: EventHandler[EventBase[T]], eventType: EventType):
         self.handlers[eventType].add(handler)
 
     def unregister(self, handler: EventHandler, eventType: EventType):
