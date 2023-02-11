@@ -4,16 +4,16 @@ import sechat
 from time import sleep
 from sechat.events import Events
 
-EMAIL1, PASSWORD1 = os.environ["EMAIL1"], os.environ["PASSWORD1"]
-try:
-    EMAIL2, PASSWORD2 = os.environ["EMAIL2"], os.environ["PASSWORD2"]
-except KeyError:
-    EMAIL2 = None
-
 bot = None
 bot2 = None
+EMAIL1, PASSWORD1, EMAIL2, PASSWORD2 = None, None, None, None
 
 def setUpModule():
+    EMAIL1, PASSWORD1 = os.environ["EMAIL1"], os.environ["PASSWORD1"]
+    try:
+        EMAIL2, PASSWORD2 = os.environ["EMAIL2"], os.environ["PASSWORD2"]
+    except KeyError:
+        EMAIL2 = None
     global bot, bot2
     bot = sechat.Bot()
     if EMAIL2:
