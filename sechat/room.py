@@ -1,5 +1,5 @@
 from typing import Optional, Any, TypeVar
-from collections.abc import Callable, Coroutine, Mapping
+from collections.abc import Callable, Coroutine, Mapping, Collection
 from time import time
 from logging import Logger, getLogger
 from asyncio import gather
@@ -9,10 +9,10 @@ import json
 from websockets.client import connect
 from aiohttp import ClientSession
 
-import backoff
+from backoff import on_exception as backoff, expo
 
 from sechat.events import EventBase, MentionEvent, EventType, EVENT_CLASSES
-
+from sechat.errors import RatelimitError, OperationFailedError
 
 T = TypeVar("T", bound=EventBase)
 EventHandler = Callable[[T], Coroutine]
@@ -97,11 +97,177 @@ class Room:
         def _on(handler: EventHandler):
             self.register(handler, eventType)
             return handler
+
         return _on
 
-    def request(self, uri: str, data: Mapping[str, Any]):
-        return self.session.post(
+    async def request(self, uri: str, data: Mapping[str, Any] = {}):
+        response = await self.session.post(
             uri,
-            data=data,
+            data=data | {"fkey": self.fkey},
             headers={"Referer": f"https://chat.stackexchange.com/rooms/{self.roomID}"},
         )
+        if response.status == 409:
+            raise RatelimitError()
+        elif response.status != 200:
+            raise OperationFailedError(response.status, await response.text())
+        return response
+
+    @backoff(expo, RatelimitError)
+    async def bookmark(self, start: int, end: int, title: str):
+        result = await (
+            await self.request(
+                "https://chat.stackexchange.com/conversation/new",
+                {
+                    "roomId": self.roomID,
+                    "firstMessageId": start,
+                    "lastMessageId": end,
+                    "title": title,
+                },
+            )
+        ).text()
+        try:
+            result = json.loads(result)
+        except json.JSONDecodeError:
+            raise OperationFailedError(result)
+        else:
+            if not result.get("ok", False):
+                raise OperationFailedError(result)
+            return True
+
+    @backoff(expo, RatelimitError)
+    async def removeBookmark(self, title: str):
+        self.logger.info(f"Removing bookmark {title}")
+        if (
+            result := (
+                await (
+                    await self.request(
+                        f"https://chat.stackexchange.com/conversation/delete/{self.roomID}/{title}"
+                    )
+                ).text()
+            )
+            != "ok"
+        ):
+            raise OperationFailedError(result)
+
+    @backoff(expo, RatelimitError)
+    async def send(self, message: str) -> int:
+        self.logger.info(f'Sending message "{message}"')
+        result = await (
+            await self.request(
+                f"https://chat.stackexchange.com/chats/{self.roomID}/messages/new",
+                {"text": message},
+            )
+        ).text()
+        try:
+            result = json.loads(result)
+        except json.JSONDecodeError:
+            raise OperationFailedError(result)
+        return result["id"]
+
+    async def reply(self, target: int, message: str) -> int:
+        return await self.send(f":{target} {message}")
+
+    @backoff(expo, RatelimitError)
+    async def edit(self, messageID: int, newMessage: str):
+        self.logger.info(f'Editing message {messageID} to "{newMessage}"')
+        if (
+            result := (
+                await (
+                    await self.request(
+                        f"https://chat.stackexchange.com/messages/{messageID}",
+                        {"text": newMessage},
+                    )
+                ).text()
+            )
+            != "ok"
+        ):
+            raise OperationFailedError(result)
+
+    @backoff(expo, RatelimitError)
+    async def delete(self, messageID: int):
+        self.logger.info(f"Deleting message {messageID}")
+        if (
+            result := (
+                await (
+                    await self.request(
+                        f"https://chat.stackexchange.com/messages/{messageID}/delete"
+                    )
+                ).text()
+            )
+            != "ok"
+        ):
+            raise OperationFailedError(result)
+
+    @backoff(expo, RatelimitError)
+    async def star(self, messageID: int):
+        self.logger.info(f"Starring message {messageID}")
+        if (
+            result := (
+                await (
+                    await self.request(
+                        f"https://chat.stackexchange.com/messages/{messageID}/star"
+                    )
+                ).text()
+            )
+            != "ok"
+        ):
+            raise OperationFailedError(result)
+
+    @backoff(expo, RatelimitError)
+    async def pin(self, messageID: int):
+        self.logger.info(f"Pinning message {messageID}")
+        if (
+            result := (
+                await (
+                    await self.request(
+                        f"https://chat.stackexchange.com/messages/{messageID}/owner-star"
+                    )
+                ).text()
+            )
+            != "ok"
+        ):
+            raise OperationFailedError(result)
+
+    @backoff(expo, RatelimitError)
+    async def unpin(self, messageID: int):
+        self.logger.info(f"Unpinning message {messageID}")
+        if (
+            result := (
+                await (
+                    await self.request(
+                        f"https://chat.stackexchange.com/messages/{messageID}/unowner-star"
+                    )
+                ).text()
+            )
+            != "ok"
+        ):
+            raise OperationFailedError(result)
+
+    @backoff(expo, RatelimitError)
+    async def clearStars(self, messageID: int):
+        self.logger.info(f"Clearing stars on message {messageID}")
+        if (
+            result := (
+                await (
+                    await self.request(
+                        f"https://chat.stackexchange.com/messages/{messageID}/unstar"
+                    )
+                ).text()
+            )
+            != "ok"
+        ):
+            raise OperationFailedError(result)
+
+    @backoff(expo, RatelimitError)
+    async def moveMessages(self, messageIDs: Collection[int], roomID: int):
+        messageIDs = set(messageIDs)
+        self.logger.info(f"Moving messages {messageIDs} to room {roomID}")
+        if result := (
+            await (
+                await self.request(
+                    f"https://chat.stackexchange.com/admin/movePosts/{self.roomID}",
+                    {"to": roomID, "ids": ",".join(map(str, messageIDs))},
+                )
+            ).text()
+        ) != len(messageIDs):
+            raise OperationFailedError(result)

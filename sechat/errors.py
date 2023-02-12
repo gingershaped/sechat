@@ -17,12 +17,12 @@ class ConnectionError(RoomError):
   '''Used for room connection errors'''
   pass
 
-class TooFastError(RoomError):
-  '''Used when messages are being sent too fast'''
+class RatelimitError(RoomError):
+  '''Used when ratelimiting is triggered'''
   pass
 
 class NotAllowedError(RoomError):
   '''Used when you try to do something you're not allowed to do'''
 
 class OperationFailedError(RoomError):
-    '''Used when an operation fails (SEChat doesn't return "ok")'''
+    '''Used when an operation fails'''
