@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from logging import Logger, getLogger
 from pathlib import Path
 from os import PathLike
+from asyncio import create_task, Task, run as runAsync
 
 import pickle
 
@@ -11,6 +12,7 @@ from platformdirs import user_cache_path
 from aiohttp import ClientSession, CookieJar
 from bs4 import BeautifulSoup, Tag
 
+from sechat.room import Room
 from sechat.errors import LoginError
 from sechat.version import __version__
 
@@ -44,6 +46,8 @@ class Bot:
         )
 
         self.email, self.password, self.host = email, password, host
+        self.roomTasks: dict[Room, Task] = {}
+        self.rooms: dict[int, Room] = {}
         await self.authenticate(email, password, host)
 
     def loadCookies(self, email: str) -> Optional[dict]:
@@ -188,8 +192,8 @@ class Bot:
                 self.logger.debug("Dumping cookies...")
                 self.dumpCookies(email, self.cookieJar)
 
-        self.fkey = self.getChatFkey()
-        self.userID = self.getChatUserId()
+        self.fkey = await self.getChatFkey()
+        self.userID = await self.getChatUserId()
         if not self.fkey or not self.userID:
             raise LoginError("Login failed. Bad email/password?")
         self.logger.debug(f"Chat fkey is {self.fkey}, user ID is {self.userID}")
@@ -199,3 +203,23 @@ class Bot:
                 "User-Agent": f"Mozilla/5.0 (compatible; automated;) sechat/{__version__} (logged in as user {self.userID}; +http://pypi.org/project/sechat)"
             }
         )
+
+    def joinRoom(self, roomID: int, logger: Optional[Logger] = None) -> Room:
+        self.logger.info(f"Joining room {roomID}")
+        if not self.fkey or not self.userID:
+            raise RuntimeError("Not logged in")
+        room = Room(self.session, self.fkey, self.userID, roomID, logger)
+        task = create_task(room.loop(), name = room.logger.name)
+        self.rooms[roomID] = room
+        self.roomTasks[room] = task
+        return room
+
+    def leaveRoom(self, roomID: int):
+        self.logger.info(f"Leaving room {roomID}")
+        room = self.rooms[roomID]
+        self.rooms.pop(roomID)
+        task = self.roomTasks.pop(room)
+        task.cancel()
+
+    def leaveAllRooms(self):
+        [self.leaveRoom(room) for room in self.rooms]

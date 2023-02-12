@@ -2,11 +2,12 @@ from typing import Optional, Any, TypeVar
 from collections.abc import Callable, Coroutine, Mapping, Collection
 from time import time
 from logging import Logger, getLogger
-from asyncio import gather
+from asyncio import gather, wait_for, CancelledError
 
 import json
 
 from websockets.client import connect
+from websockets.exceptions import ConnectionClosed
 from aiohttp import ClientSession
 
 from backoff import on_exception as backoff, expo
@@ -41,6 +42,18 @@ class Room:
         }
         self.register(self._mentionHandler, EventType.MENTION)
 
+    def __hash__(self):
+        return hash(self.roomID)
+
+    async def __aenter__(self):
+        pass
+    async def __aexit__(self, exc_type, exc, tb):
+        self.logger.info("Shutting down...")
+        await self.request(
+            f"https://chat.stackexchange.com/chats/leave/{self.roomID}",
+            data={"quiet": True},
+        )
+
     async def _mentionHandler(self, event: MentionEvent):
         await self.session.post(
             "https://chat.stackexchange.com/messages/ack",
@@ -53,20 +66,40 @@ class Room:
                 "https://chat.stackexchange.com/ws-auth",
                 data={"fkey": self.fkey, "roomid": self.roomID},
             ) as r:
-                yield connect((await r.json())["url"] + f"?l={int(time())}")
+                yield connect(
+                    (await r.json())["url"] + f"?l={int(time())}", close_timeout=10
+                )
 
     async def loop(self):
-        async for connection in self.getSockets():
-            async with connection as socket:
-                data = await socket.recv()
-            if data is not None and data != "":
-                try:
-                    data = json.loads(data)
-                except (json.JSONDecodeError, TypeError):
-                    self.logger.warning(f"Recieved malformed packet: {data}")
-                    continue
-                self.lastPing = time.time()
-                await self.process(data)
+        async with self:
+            async for connection in self.getSockets():
+                async with connection as socket:
+                    self.logger.info("Connected!")
+                    while True:
+                        try:
+                            data = await wait_for(socket.recv(), timeout=120)
+                        except ConnectionClosed:
+                            self.logger.warning(
+                                "Connection was closed. Attempting to reconnect..."
+                            )
+                            break
+                        except TimeoutError:
+                            self.logger.warning(
+                                "No data recieved in a while, the connection may have dropped. Attempting to reconnect..."
+                            )
+                            break
+                        except CancelledError:
+                            raise
+                        except Exception:
+                            self.logger.critical(f"An error occurred while recieving data!")
+                            raise
+                        if data is not None and data != "":
+                            try:
+                                data = json.loads(data)
+                            except (json.JSONDecodeError, TypeError):
+                                self.logger.warning(f"Recieved malformed packet: {data}")
+                                continue
+                            await self.process(data)
 
     async def process(self, data: dict):
         if f"r{self.roomID}" in data:
