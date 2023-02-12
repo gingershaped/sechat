@@ -8,7 +8,7 @@ import json
 
 from websockets.client import connect
 from websockets.exceptions import ConnectionClosed
-from aiohttp import ClientSession
+from aiohttp import ClientSession, CookieJar
 
 from backoff import on_exception as backoff, expo
 
@@ -16,13 +16,13 @@ from sechat.events import EventBase, MentionEvent, EventType, EVENT_CLASSES
 from sechat.errors import RatelimitError, OperationFailedError
 
 T = TypeVar("T", bound=EventBase)
-EventHandler = Callable[[T], Coroutine]
+EventHandler = Callable[["Room", T], Coroutine]
 
 
 class Room:
     def __init__(
         self,
-        session: ClientSession,
+        cookies: CookieJar,
         fkey: str,
         userID: int,
         roomID: int,
@@ -32,7 +32,7 @@ class Room:
             self.logger = logger
         else:
             self.logger = getLogger(f"Room-{roomID}")
-        self.session = session
+        self.session = ClientSession(cookie_jar = cookies)
         self.fkey = fkey
         self.userID = userID
         self.roomID = roomID
@@ -46,34 +46,34 @@ class Room:
         return hash(self.roomID)
 
     async def __aenter__(self):
-        pass
+        return self
     async def __aexit__(self, exc_type, exc, tb):
         self.logger.info("Shutting down...")
         await self.request(
-            f"https://chat.stackexchange.com/chats/leave/{self.roomID}",
-            data={"quiet": True},
+            f"https://chat.stackexchange.com/chats/leave/{self.roomID}"
         )
+        await self.session.close()
 
-    async def _mentionHandler(self, event: MentionEvent):
+    async def _mentionHandler(self, _, event: MentionEvent):
         await self.session.post(
             "https://chat.stackexchange.com/messages/ack",
             data={"id": event.message_id, "fkey": self.fkey},
         )
 
-    async def getSockets(self):
+    async def getSocketUrls(self):
         while True:
             async with self.session.post(
                 "https://chat.stackexchange.com/ws-auth",
                 data={"fkey": self.fkey, "roomid": self.roomID},
             ) as r:
-                yield connect(
-                    (await r.json())["url"] + f"?l={int(time())}", close_timeout=10
-                )
+                url = (await r.json())["url"] + f"?l={int(time())}"
+                self.logger.info(f"Connecting to {url}")
+                yield url
 
     async def loop(self):
         async with self:
-            async for connection in self.getSockets():
-                async with connection as socket:
+            async for url in self.getSocketUrls():
+                async with connect(url, close_timeout=10) as socket:
                     self.logger.info("Connected!")
                     while True:
                         try:
@@ -91,7 +91,7 @@ class Room:
                         except CancelledError:
                             raise
                         except Exception:
-                            self.logger.critical(f"An error occurred while recieving data!")
+                            self.logger.critical("An error occurred while recieving data!")
                             raise
                         if data is not None and data != "":
                             try:
@@ -115,7 +115,7 @@ class Room:
     async def handle(self, eventType: EventType, eventData: dict):
         return await gather(
             *(
-                handler(EVENT_CLASSES[eventType](**eventData))
+                handler(self, EVENT_CLASSES[eventType](**eventData))
                 for handler in self.handlers[eventType]
             )
         )

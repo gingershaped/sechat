@@ -1,9 +1,11 @@
-from typing import Optional, Union, cast
+from typing import Optional, cast, DefaultDict
 from collections.abc import Mapping
 from logging import Logger, getLogger
 from pathlib import Path
-from os import PathLike
+from os import PathLike, makedirs
+from os.path import exists
 from asyncio import create_task, Task, run as runAsync
+from http.cookies import Morsel
 
 import pickle
 
@@ -11,6 +13,7 @@ import pickle
 from platformdirs import user_cache_path
 from aiohttp import ClientSession, CookieJar
 from bs4 import BeautifulSoup, Tag
+from hashlib import md5
 
 from sechat.room import Room
 from sechat.errors import LoginError
@@ -18,11 +21,8 @@ from sechat.version import __version__
 
 
 class Bot:
-    async def __init__(
+    def __init__(
         self,
-        email: str,
-        password: str,
-        host: str,
         useCookies: bool = True,
         logger: Optional[Logger] = None,
         cachePath: Optional[PathLike] = None,
@@ -36,6 +36,7 @@ class Bot:
             self.cachePath = Path(cachePath)
         else:
             self.cachePath = user_cache_path("sechat", None, __version__)
+        makedirs(self.cachePath, exist_ok = True)
 
         self.cookieJar = CookieJar()
         self.session = ClientSession(cookie_jar = self.cookieJar)
@@ -45,31 +46,21 @@ class Bot:
             }
         )
 
-        self.email, self.password, self.host = email, password, host
         self.roomTasks: dict[Room, Task] = {}
         self.rooms: dict[int, Room] = {}
-        await self.authenticate(email, password, host)
 
-    def loadCookies(self, email: str) -> Optional[dict]:
-        cookiePath = self.cachePath / "sechat_cookies.dat"
+    def loadCookies(self, email: str, cookies: CookieJar):
+        cookiePath = self.cachePath / f"sechat_cookies_{md5(email.encode('utf-8')).hexdigest()}.dat"
         try:
-            with open(cookiePath, "rb") as f:
-                try:
-                    return pickle.load(f)[email]
-                except KeyError:
-                    self.logger.warning(
-                        f"Email {email} not found in cookie file! ({cookiePath})"
-                    )
+            cookies.load(cookiePath)
         except FileNotFoundError:
             self.logger.debug("No cookies found :(")
+        else:
+            return True
 
     def dumpCookies(self, email: str, cookies: CookieJar):
-        cookiePath = self.cachePath / "sechat_cookies.dat"
-        with open(cookiePath, "rb") as f:
-            cookieData: dict[str, CookieJar] = pickle.load(f)
-        cookieData[email] = cookies
-        with open(cookiePath, "wb") as f:
-            pickle.dump(cookieData, f)
+        cookiePath = self.cachePath / f"sechat_cookies_{md5(email.encode('utf-8')).hexdigest()}.dat"
+        cookies.save(cookiePath)
         self.logger.debug(f"Dumped cookies to {cookiePath}")
 
     async def getChatFkey(self) -> Optional[str]:
@@ -168,10 +159,10 @@ class Bot:
 
     async def authenticate(self, email: str, password: str, host: str):
         if self.useCookies:
-            if cookies := self.loadCookies(email):
+            if self.loadCookies(email, self.cookieJar):
                 self.logger.debug("Loaded cookies")
-                self.cookieJar.update_cookies(cookies)
-        if "acct" not in self.cookieJar._cookies:
+        self.cookieJar._do_expiration()
+        if "acct" not in self.cookieJar._cookies.get("stackexchange.com", {}):
             self.logger.debug("Logging into SE...")
             self.logger.debug("Acquiring fkey...")
             fkey = await self.scrapeFkey()
@@ -208,8 +199,8 @@ class Bot:
         self.logger.info(f"Joining room {roomID}")
         if not self.fkey or not self.userID:
             raise RuntimeError("Not logged in")
-        room = Room(self.session, self.fkey, self.userID, roomID, logger)
-        task = create_task(room.loop(), name = room.logger.name)
+        room = Room(self.cookieJar, self.fkey, self.userID, roomID, logger)
+        task = create_task(room.loop(), name=room.logger.name)
         self.rooms[roomID] = room
         self.roomTasks[room] = task
         return room
@@ -222,4 +213,11 @@ class Bot:
         task.cancel()
 
     def leaveAllRooms(self):
-        [self.leaveRoom(room) for room in self.rooms]
+        [self.leaveRoom(room) for room in list(self.rooms.keys())]
+
+    async def __aenter__(self):
+        return self
+    async def __aexit__(self, exc_type, exc, tb):
+        self.logger.info("Shutting down...")
+        self.leaveAllRooms()
+        await self.session.close()
