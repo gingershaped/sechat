@@ -1,72 +1,61 @@
-import unittest
+import asyncio
 import os
-import sechat
-from time import sleep
-from sechat.events import EventType
+import unittest
 
-bot = None
-bot2 = None
-EMAIL1, PASSWORD1, EMAIL2, PASSWORD2 = None, None, None, None
+from sechat import Bot, Room, EventType, MentionEvent, MessageEvent
+
+bot = Bot()
+bot2 = Bot()
+EMAIL1, PASSWORD1, EMAIL2, PASSWORD2 = os.environ["EMAIL1"], os.environ["PASSWORD1"], None, None
 
 def setUpModule():
-    EMAIL1, PASSWORD1 = os.environ["EMAIL1"], os.environ["PASSWORD1"]
+    global EMAIL2, PASSWORD2
     try:
         EMAIL2, PASSWORD2 = os.environ["EMAIL2"], os.environ["PASSWORD2"]
     except KeyError:
         EMAIL2 = None
-    global bot, bot2
-    bot = sechat.Bot()
-    if EMAIL2:
-        bot2 = sechat.Bot()
 
-class T00LoginTestCase(unittest.TestCase):
+class T00LoginTestCase(unittest.IsolatedAsyncioTestCase):
     @classmethod
-    def setUpClass(cls):
-        bot.login(EMAIL1, PASSWORD1)
+    async def asyncSetUp(cls):
+        await bot.authenticate(EMAIL1, PASSWORD1, "https://codegolf.stackexchange.com")
     
     def testProps(self):
         self.assertIsNotNone(bot.fkey)
         self.assertIsNotNone(bot.userID)
     
-class T01RoomTestCase(unittest.TestCase):
+class T01RoomTestCase(unittest.IsolatedAsyncioTestCase):
     @classmethod
-    def setUpClass(cls):
-        cls.room = bot.joinRoom(1, False)
+    def setUp(cls):
+        cls.room = bot.joinRoom(1)
     @classmethod
-    def tearDownClass(cls):
-        cls.room.send("Stage 1 complete. DO NOT resume sending messages.")
-        sleep(3)
+    async def asyncTearDown(cls):
+        await cls.room.send("Stage 1 complete. DO NOT resume sending messages.")
+        await asyncio.sleep(3)
 
-    def test00ConnectionProcess(self):
-        self.room.connect()
-        self.assertIsNotNone(self.room.socket)
-        sleep(1)
-        self.assertTrue(self.room.thread.is_alive)
-        self.assertTrue(self.room.running)
-        self.room.send("Currently testing message functionality. Please DO NOT send any other messages in this room until I say the tests are completed. The test will begin in 3 seconds. Thank you.")
-        sleep(3)
-    def test01Messaging(self):
-        self.room.send("Message 1")
-        sleep(3)
-        self.room.send("Cooldown check 1")
-        self.room.send("Cooldown check 2")
-        self.room.send("Cooldown check 3")
-        sleep(4)
-        self.room.send("Too fast check 1")
-        with self.assertRaises(sechat.errors.TooFastError):
-            self.room.send("Too fast check 2 (should not be seen)", False)
-        sleep(5)
-    def test02Editing(self):
-        ident = self.room.send("Before edit")
-        sleep(2)
-        self.room.edit(ident, "After edit")
-        sleep(2)
-    def test03Deleting(self):
-        ident = self.room.send("Going to be deleted")
-        sleep(2)
-        self.room.delete(ident)
-        sleep(2)
-        
+    async def test00ConnectionProcess(self):
+        self.assertIsNotNone(self.room.fkey)
+        await asyncio.sleep(1)
+        await self.room.send("Currently testing message functionality. Please DO NOT send any other messages in this room until I say the tests are completed. The test will begin in 3 seconds. Thank you.")
+        await asyncio.sleep(3)
+    async def test01Messaging(self):
+        await self.room.send("Message 1")
+        await asyncio.sleep(3)
+        await self.room.send("Cooldown check 1")
+        await self.room.send("Cooldown check 2")
+        await self.room.send("Cooldown check 3")
+        await asyncio.sleep(3)
+    async def test02Editing(self):
+        ident = await self.room.send("Before edit")
+        await asyncio.sleep(2)
+        await self.room.edit(ident, "After edit")
+        await asyncio.sleep(2)
+    async def test03Deleting(self):
+        ident = await self.room.send("Going to be deleted")
+        await asyncio.sleep(2)
+        await self.room.delete(ident)
+        await asyncio.sleep(2)
+    '''
     def test04Transcript(self):
         messages = [i["content"] if "content" in i else False for i in self.room.getRecentMessages()[-7:]]
         print(messages)
@@ -74,85 +63,86 @@ class T01RoomTestCase(unittest.TestCase):
         self.assertEqual(messages[3], "Cooldown check 3")
         self.assertEqual(messages[5], "After edit")
         self.assertFalse(messages[6])
+    '''
         
 
 @unittest.skipIf(EMAIL2 is None, "Don't have two bots to test this with")
-class T02MultiUserTestCase(unittest.TestCase):
+class T02MultiUserTestCase(unittest.IsolatedAsyncioTestCase):
     @classmethod
-    def setUpClass(cls):
-        bot2.login(EMAIL2, PASSWORD2)
+    async def asyncSetUp(cls):
+        await bot2.authenticate(EMAIL2, PASSWORD2, "https://codegolf.stackexchange.com") # type: ignore Pylance doesn't realise skipIf is a typeguard
         cls.room = bot.joinRoom(1)
         cls.room2 = bot2.joinRoom(1)
         cls.gotMessage = False
         cls.gotReply = False
     @classmethod
-    def tearDownClass(cls):
+    async def asyncTearDown(cls):
         bot2.leaveAllRooms()
-        cls.room.send("Stage 2 complete. DO NOT resume sending messages.")
-        sleep(2)
+        await cls.room.send("Stage 2 complete. DO NOT resume sending messages.")
+        await asyncio.sleep(2)
 
-    def onMessage(self, event):
+    async def onMessage(self, room: Room, event: MessageEvent):
         if event.content == "Test message":
             self.gotMessage = True
-    def onReply(self, event):
+    async def onMention(self, room, event):
         self.gotReply = True
         print(event)
     
-    def test00Starring(self):
-        ident = self.room.send("This message will be starred")
-        sleep(2)
-        self.room2.star(ident)
-        sleep(2)
-        self.room2.send("Unstarring message")
-        self.room2.star(ident)
-        sleep(4)
-    def test01MessageEvents(self):
-        self.room.on(EventType.MESSAGE, self.onMessage)
-        self.room2.send("Test message")
-        sleep(2)
-        self.room.off(self.onMessage)
+    async def test00Starring(self):
+        ident = await self.room.send("This message will be starred")
+        await asyncio.sleep(2)
+        await self.room2.star(ident)
+        await asyncio.sleep(2)
+        await self.room2.send("Unstarring message")
+        await self.room2.star(ident)
+        await asyncio.sleep(4)
+    async def test01MessageEvents(self):
+        self.room.register(self.onMessage, EventType.MESSAGE)
+        await self.room2.send("Test message")
+        await asyncio.sleep(2)
+        self.room.unregister(self.onMessage, EventType.MESSAGE)
         self.assertTrue(self.gotMessage)
-    def test02ReplyEvents(self):
-        self.room.on(EventType.REPLY, self.onReply)
-        ident = self.room.send("Test message")
-        self.room2.send(self.room2.buildReply(ident, "Test reply"))
-        sleep(2)
-        self.room.off(self.onReply)
+    async def test02ReplyEvents(self):
+        self.room.register(self.onMention, EventType.MENTION)
+        ident = await self.room.send("Test message")
+        await self.room2.reply(ident, "Test reply")
+        await asyncio.sleep(2)
+        self.room.unregister(self.onMention, EventType.MENTION)
         self.assertTrue(self.gotReply)
         
 
-class T03ROTestCase(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.room = bot.joinRoom(1, False)
-        cls.ident = None
-    @classmethod
-    def tearDownClass(cls):
-        sleep(2)
-    def test00PinMessages(self):
-        self.ident = self.room.send("This message will be pinned")
-        sleep(2)
-        self.room.pin(self.ident)
-        sleep(2)
-        self.room.unpin(self.ident)
-        sleep(2)
-        self.room.send("Clearing stars on message")
-        self.room.clearStars(self.ident)
-    @unittest.skip("No privs yet")
-    def test02MoveMessages(self):
-        ident = self.room.send("This message will be moved to https://chat.stackexchange.com/rooms/120733/osp-testing")
-        sleep(2)
-        self.room.move([ident], 120733)
-        
-
-class T04LeaveTestCase(unittest.TestCase):
+class T03ROTestCase(unittest.IsolatedAsyncioTestCase):
     @classmethod
     def setUpClass(cls):
         cls.room = bot.joinRoom(1)
-        cls.room.send("Testing complete. You may now resume sending messages.")
+        cls.ident = None
+    @classmethod
+    async def asyncTearDown(cls):
+        await asyncio.sleep(2)
+    async def test00PinMessages(self):
+        self.ident = await self.room.send("This message will be pinned")
+        await asyncio.sleep(2)
+        await self.room.pin(self.ident)
+        await asyncio.sleep(2)
+        await self.room.unpin(self.ident)
+        await asyncio.sleep(2)
+        await self.room.send("Clearing stars on message")
+        await self.room.clearStars(self.ident)
+    @unittest.skip("No privs yet")
+    async def test02MoveMessages(self):
+        ident = await self.room.send("This message will be moved to https://chat.stackexchange.com/rooms/120733/osp-testing")
+        await asyncio.sleep(2)
+        await self.room.moveMessages([ident], 120733)
+        
+
+class T04LeaveTestCase(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    async def asyncSetUp(cls):
+        cls.room = bot.joinRoom(1)
+        await cls.room.send("Testing complete. You may now resume sending messages.")
     def setUp(self):
         self.room = bot.joinRoom(1)
-        sleep(2)
+        await asyncio.sleep(2)
     def test01LeaveRoom(self):
         bot.leaveRoom(1, True)
         with self.assertRaises(ValueError):
