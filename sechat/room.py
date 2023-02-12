@@ -32,7 +32,7 @@ class Room:
             self.logger = logger
         else:
             self.logger = getLogger(f"Room-{roomID}")
-        self.session = ClientSession(cookie_jar = cookies)
+        self.session = ClientSession(cookie_jar=cookies)
         self.fkey = fkey
         self.userID = userID
         self.roomID = roomID
@@ -47,11 +47,10 @@ class Room:
 
     async def __aenter__(self):
         return self
+
     async def __aexit__(self, exc_type, exc, tb):
         self.logger.info("Shutting down...")
-        await self.request(
-            f"https://chat.stackexchange.com/chats/leave/{self.roomID}"
-        )
+        await self.request(f"https://chat.stackexchange.com/chats/leave/{self.roomID}")
         await self.session.close()
 
     async def _mentionHandler(self, _, event: MentionEvent):
@@ -73,11 +72,11 @@ class Room:
     async def loop(self):
         async with self:
             async for url in self.getSocketUrls():
-                async with connect(url, close_timeout=10) as socket:
+                async with connect(url, origin="http://chat.stackexchange.com", close_timeout=10, ping_interval = None) as socket:  # type: ignore It doesn't like the origin header for some reason
                     self.logger.info("Connected!")
                     while True:
                         try:
-                            data = await wait_for(socket.recv(), timeout=120)
+                            data = await wait_for(socket.recv(), timeout=60)
                         except ConnectionClosed:
                             self.logger.warning(
                                 "Connection was closed. Attempting to reconnect..."
@@ -91,13 +90,17 @@ class Room:
                         except CancelledError:
                             raise
                         except Exception:
-                            self.logger.critical("An error occurred while recieving data!")
+                            self.logger.critical(
+                                "An error occurred while recieving data!"
+                            )
                             raise
                         if data is not None and data != "":
                             try:
                                 data = json.loads(data)
                             except (json.JSONDecodeError, TypeError):
-                                self.logger.warning(f"Recieved malformed packet: {data}")
+                                self.logger.warning(
+                                    f"Recieved malformed packet: {data}"
+                                )
                                 continue
                             await self.process(data)
 
