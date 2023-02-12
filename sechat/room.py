@@ -1,22 +1,22 @@
-from typing import Optional, Any, TypeVar, Generic
-from collections.abc import Callable, Coroutine
+from typing import Optional, Any, TypeVar
+from collections.abc import Callable, Coroutine, Mapping
 from time import time
 from logging import Logger, getLogger
 from asyncio import gather
-from functools import partial
 
 import json
 
 from websockets.client import connect
 from aiohttp import ClientSession
 
-from sechat.events import EventBase, MentionEvent, EventType, EventTypeMember, EVENT_CLASSES
+import backoff
+
+from sechat.events import EventBase, MentionEvent, EventType, EVENT_CLASSES
 
 
+T = TypeVar("T", bound=EventBase)
+EventHandler = Callable[[T], Coroutine]
 
-
-ET = TypeVar("ET", bound = EventBase, contravariant=True)
-EventHandler = Callable[[ET], Coroutine]
 
 class Room:
     def __init__(
@@ -87,8 +87,7 @@ class Room:
             )
         )
 
-    T = TypeVar("T", bound = EventTypeMember)
-    def register(self, handler: EventHandler[EventBase[T]], eventType: EventType):
+    def register(self, handler: EventHandler, eventType: EventType):
         self.handlers[eventType].add(handler)
 
     def unregister(self, handler: EventHandler, eventType: EventType):
@@ -99,3 +98,10 @@ class Room:
             self.register(handler, eventType)
             return handler
         return _on
+
+    def request(self, uri: str, data: Mapping[str, Any]):
+        return self.session.post(
+            uri,
+            data=data,
+            headers={"Referer": f"https://chat.stackexchange.com/rooms/{self.roomID}"},
+        )

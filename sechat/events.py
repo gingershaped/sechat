@@ -5,7 +5,6 @@ from dataclasses import dataclass, field, InitVar
 from datetime import datetime
 from collections import defaultdict
 
-T = TypeVar("T", bound = "EventBase")
 class EventType(Enum):
     MESSAGE = 1
     EDIT = 2
@@ -33,19 +32,16 @@ class EventType(Enum):
     USER_MERGE = 24
     USER_NAME_OR_AVATAR_CHANGE = 25
 
-EventTypeMember = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25] # >:(
-assert set(get_args(EventTypeMember)) == {member.value for member in EventType}
 
-V = TypeVar("V", bound = EventTypeMember)
-@dataclass
-class EventBase(Generic[V]):
-    eventType: V = field(init = False)
+class EventBase:
+    pass
 
 class UnknownEvent(EventBase):
     def __init__(self, **kwargs):
         self.eventType = EventType(kwargs["event_type"])
         self.args = kwargs
 
+@dataclass
 class Event(EventBase):
     event_type: InitVar[int]
     time_stamp: InitVar[int]

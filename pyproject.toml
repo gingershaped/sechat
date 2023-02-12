@@ -7,11 +7,11 @@ authors = ["Ginger <75683114+gingerindustries@users.noreply.github.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.9.0,<4.0.0"
-requests = "^2.27.0"
 bs4 = "^0.0.1"
 platformdirs = "^3.0.0"
 websockets = "^10.4"
 aiohttp = "^3.8.3"
+backoff = "^2.2.1"
 
 [tool.poetry.dev-dependencies]
 # Remember to update docs/build-requirements.txt!
