@@ -66,6 +66,7 @@ class MessageEvent(RoomEvent):
     user_id: int
     user_name: str
     parent_id: Optional[int] = None
+    show_parent: Any = None # idfk what this is
 
 
 @dataclass
