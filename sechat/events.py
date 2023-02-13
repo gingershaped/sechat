@@ -1,4 +1,4 @@
-from typing import Any, Generic, TypeVar, Literal, get_args
+from typing import Any, Generic, TypeVar, Literal, get_args, Optional
 from collections.abc import Mapping
 from enum import Enum
 from dataclasses import dataclass, field, InitVar
@@ -65,12 +65,12 @@ class MessageEvent(RoomEvent):
     message_id: int
     user_id: int
     user_name: str
+    parent_id: Optional[int] = None
 
 
 @dataclass
 class MentionEvent(MessageEvent):
-    parent_id: int
-    target_user_id: int
+    target_user_id: int = 0
 
 
 EVENT_CLASSES = defaultdict(lambda: UnknownEvent, {
