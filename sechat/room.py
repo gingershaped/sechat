@@ -72,7 +72,7 @@ class Room:
     async def loop(self):
         async with self:
             async for url in self.getSocketUrls():
-                async with connect(url, origin="http://chat.stackexchange.com", close_timeout=10, ping_interval = None) as socket:  # type: ignore It doesn't like the origin header for some reason
+                async with connect(url, origin="http://chat.stackexchange.com", close_timeout=3, ping_interval = None) as socket:  # type: ignore It doesn't like the origin header for some reason
                     self.logger.info("Connected!")
                     while True:
                         try:
