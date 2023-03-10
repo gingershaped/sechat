@@ -1,5 +1,4 @@
-from typing import Any, Generic, TypeVar, Literal, get_args, Optional
-from collections.abc import Mapping
+from typing import Any, Optional
 from enum import Enum
 from dataclasses import dataclass, field, InitVar
 from datetime import datetime
@@ -70,7 +69,8 @@ class MessageEvent(RoomEvent):
     parent_id: Optional[int] = None
     show_parent: Any = None # idfk what this is
 
-    def __post_init__(self):
+    def __post_init__(self, event_type, time_stamp):
+        super().__post_init__(event_type, time_stamp)
         self.content = unescape(self.content)
 
 
