@@ -4,6 +4,8 @@ from enum import Enum
 from dataclasses import dataclass, field, InitVar
 from datetime import datetime
 from collections import defaultdict
+from html import unescape
+
 
 class EventType(Enum):
     MESSAGE = 1
@@ -65,6 +67,9 @@ class MessageEvent(RoomEvent):
     message_id: int
     user_id: int
     user_name: str
+
+    def __post_init__(self):
+        self.content = unescape(self.content)
 
 
 @dataclass
