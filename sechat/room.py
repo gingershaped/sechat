@@ -72,7 +72,7 @@ class Room:
     async def loop(self):
         async with self:
             async for url in self.getSocketUrls():
-                async with connect(url, origin="http://chat.stackexchange.com", close_timeout=10, ping_interval = None) as socket:  # type: ignore It doesn't like the origin header for some reason
+                async with connect(url, origin="http://chat.stackexchange.com", close_timeout=3, ping_interval = None) as socket:  # type: ignore It doesn't like the origin header for some reason
                     self.logger.info("Connected!")
                     while True:
                         try:
@@ -173,7 +173,7 @@ class Room:
     @backoff(expo, RatelimitError)
     async def removeBookmark(self, title: str):
         self.logger.info(f"Removing bookmark {title}")
-        if (
+        if not (
             result := (
                 await (
                     await self.request(
@@ -206,7 +206,7 @@ class Room:
     @backoff(expo, RatelimitError)
     async def edit(self, messageID: int, newMessage: str):
         self.logger.info(f'Editing message {messageID} to "{newMessage}"')
-        if (
+        if not (
             result := (
                 await (
                     await self.request(
@@ -222,7 +222,7 @@ class Room:
     @backoff(expo, RatelimitError)
     async def delete(self, messageID: int):
         self.logger.info(f"Deleting message {messageID}")
-        if (
+        if not (
             result := (
                 await (
                     await self.request(
@@ -237,7 +237,7 @@ class Room:
     @backoff(expo, RatelimitError)
     async def star(self, messageID: int):
         self.logger.info(f"Starring message {messageID}")
-        if (
+        if not (
             result := (
                 await (
                     await self.request(
@@ -252,7 +252,7 @@ class Room:
     @backoff(expo, RatelimitError)
     async def pin(self, messageID: int):
         self.logger.info(f"Pinning message {messageID}")
-        if (
+        if not (
             result := (
                 await (
                     await self.request(
@@ -267,7 +267,7 @@ class Room:
     @backoff(expo, RatelimitError)
     async def unpin(self, messageID: int):
         self.logger.info(f"Unpinning message {messageID}")
-        if (
+        if not (
             result := (
                 await (
                     await self.request(
@@ -282,7 +282,7 @@ class Room:
     @backoff(expo, RatelimitError)
     async def clearStars(self, messageID: int):
         self.logger.info(f"Clearing stars on message {messageID}")
-        if (
+        if not (
             result := (
                 await (
                     await self.request(

@@ -1,4 +1,4 @@
-from typing import Any, Generic, TypeVar, Literal, get_args
+from typing import Any, Generic, TypeVar, Literal, get_args, Optional
 from collections.abc import Mapping
 from enum import Enum
 from dataclasses import dataclass, field, InitVar
@@ -30,9 +30,9 @@ class EventType(Enum):
     MESSAGE_MOVED_IN = 20
     TIME_BREAK = 21
     FEED_TICKER = 22
-    USER_SUSPENSION = 23
-    USER_MERGE = 24
-    USER_NAME_OR_AVATAR_CHANGE = 25
+    USER_SUSPENSION = 29
+    USER_MERGE = 30
+    USER_NAME_OR_AVATAR_CHANGE = 34
 
 
 class EventBase:
@@ -67,6 +67,8 @@ class MessageEvent(RoomEvent):
     message_id: int
     user_id: int
     user_name: str
+    parent_id: Optional[int] = None
+    show_parent: Any = None # idfk what this is
 
     def __post_init__(self):
         self.content = unescape(self.content)
@@ -74,8 +76,7 @@ class MessageEvent(RoomEvent):
 
 @dataclass
 class MentionEvent(MessageEvent):
-    parent_id: int
-    target_user_id: int
+    target_user_id: int = 0
 
 
 EVENT_CLASSES = defaultdict(lambda: UnknownEvent, {
