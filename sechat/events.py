@@ -37,10 +37,12 @@ class EventType(Enum):
 class EventBase:
     pass
 
+
 class UnknownEvent(EventBase):
     def __init__(self, **kwargs):
         self.eventType = EventType(kwargs["event_type"])
         self.args = kwargs
+
 
 @dataclass
 class Event(EventBase):
@@ -67,7 +69,7 @@ class MessageEvent(RoomEvent):
     user_id: int
     user_name: str
     parent_id: Optional[int] = None
-    show_parent: Any = None # idfk what this is
+    show_parent: Any = None  # idfk what this is
 
     def __post_init__(self, event_type, time_stamp):
         super().__post_init__(event_type, time_stamp)
@@ -75,11 +77,20 @@ class MessageEvent(RoomEvent):
 
 
 @dataclass
+class EditEvent(MessageEvent):
+    message_edits: int = 0
+
+
+@dataclass
 class MentionEvent(MessageEvent):
     target_user_id: int = 0
 
 
-EVENT_CLASSES = defaultdict(lambda: UnknownEvent, {
-    EventType.MESSAGE: MessageEvent,
-    EventType.MENTION: MentionEvent
-})
+EVENT_CLASSES = defaultdict(
+    lambda: UnknownEvent,
+    {
+        EventType.MESSAGE: MessageEvent,
+        EventType.MENTION: MentionEvent,
+        EventType.EDIT: EditEvent,
+    },
+)
