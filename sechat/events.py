@@ -95,6 +95,7 @@ EVENT_CLASSES = defaultdict(
     {
         EventType.MESSAGE: MessageEvent,
         EventType.MENTION: MentionEvent,
+        EventType.REPLY: ReplyEvent,
         EventType.EDIT: EditEvent,
     },
 )
