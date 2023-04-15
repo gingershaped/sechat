@@ -85,6 +85,10 @@ class EditEvent(MessageEvent):
 class MentionEvent(MessageEvent):
     target_user_id: int = 0
 
+@dataclass
+class ReplyEvent(MessageEvent):
+    target_user_id: int = 0
+
 
 EVENT_CLASSES = defaultdict(
     lambda: UnknownEvent,
