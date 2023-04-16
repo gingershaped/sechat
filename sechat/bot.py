@@ -219,5 +219,4 @@ class Bot:
         return self
     async def __aexit__(self, exc_type, exc, tb):
         self.logger.info("Shutting down...")
-        self.leaveAllRooms()
         await wait_for(self.session.close(), 3)
