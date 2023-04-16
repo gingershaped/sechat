@@ -3,8 +3,7 @@ from collections.abc import Mapping
 from logging import Logger, getLogger
 from pathlib import Path
 from os import PathLike, makedirs
-from os.path import exists
-from asyncio import create_task, Task, wait_for
+from asyncio import create_task, Task, wait_for, run
 from http.cookies import Morsel
 
 import pickle
@@ -219,4 +218,10 @@ class Bot:
         return self
     async def __aexit__(self, exc_type, exc, tb):
         self.logger.info("Shutting down...")
-        await wait_for(self.session.close(), 3)
+        run(wait_for(self.session.close(), 3))
+        self.logger.debug("Shutdown completed!")
+
+    async def loop(self):
+        for task in self.roomTasks.values():
+            if task.done():
+                task.exception()
