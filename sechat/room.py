@@ -55,6 +55,7 @@ class Room:
             await wait_for(self.session.close(), 3)
         except TimeoutError:
             pass
+        self.logger.debug("Shutdown completed!")
 
     async def _mentionHandler(self, _, event: MentionEvent):
         await self.session.post(

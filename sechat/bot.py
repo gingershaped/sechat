@@ -4,7 +4,7 @@ from logging import Logger, getLogger
 from pathlib import Path
 from os import PathLike, makedirs
 from os.path import exists
-from asyncio import create_task, Task, run as runAsync
+from asyncio import create_task, Task, wait_for
 from http.cookies import Morsel
 
 import pickle
@@ -162,7 +162,7 @@ class Bot:
             if self.loadCookies(email, self.cookieJar):
                 self.logger.debug("Loaded cookies")
         self.cookieJar._do_expiration()
-        if "acct" not in self.cookieJar._cookies.get("stackexchange.com", {}):
+        if "acct" not in self.cookieJar._cookies.get(("stackexchange.com", "/"), {}):
             self.logger.debug("Logging into SE...")
             self.logger.debug("Acquiring fkey...")
             fkey = await self.scrapeFkey()
@@ -220,4 +220,4 @@ class Bot:
     async def __aexit__(self, exc_type, exc, tb):
         self.logger.info("Shutting down...")
         self.leaveAllRooms()
-        await self.session.close()
+        wait_for(await self.session.close(), 3)
