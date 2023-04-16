@@ -221,7 +221,7 @@ class Bot:
         run(wait_for(self.session.close(), 3))
         self.logger.debug("Shutdown completed!")
 
-    async def loop(self):
+    async def checkTasks(self):
         for task in self.roomTasks.values():
             if task.done():
                 task.exception()
