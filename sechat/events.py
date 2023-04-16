@@ -83,10 +83,12 @@ class EditEvent(MessageEvent):
 
 @dataclass
 class MentionEvent(MessageEvent):
+    message_edits: int = 0
     target_user_id: int = 0
 
 @dataclass
 class ReplyEvent(MessageEvent):
+    message_edits: int = 0
     target_user_id: int = 0
 
 
