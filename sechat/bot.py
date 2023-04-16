@@ -224,4 +224,5 @@ class Bot:
     async def checkTasks(self):
         for task in self.roomTasks.values():
             if task.done():
-                task.exception()
+                if (exception := task.exception()) != None:
+                    raise exception
