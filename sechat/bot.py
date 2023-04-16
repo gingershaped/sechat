@@ -220,4 +220,4 @@ class Bot:
     async def __aexit__(self, exc_type, exc, tb):
         self.logger.info("Shutting down...")
         self.leaveAllRooms()
-        wait_for(await self.session.close(), 3)
+        await wait_for(self.session.close(), 3)
