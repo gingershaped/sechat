@@ -2,7 +2,7 @@ from typing import Optional, Any, TypeVar
 from collections.abc import Callable, Coroutine, Mapping, Collection
 from time import time
 from logging import Logger, getLogger
-from asyncio import gather, wait_for, CancelledError, timeout
+from asyncio import gather, wait_for, CancelledError
 
 import json
 
@@ -51,9 +51,8 @@ class Room:
     async def __aexit__(self, exc_type, exc, tb):
         self.logger.info("Shutting down...")
         try:
-            async with timeout(5):
-                await self.request(f"https://chat.stackexchange.com/chats/leave/{self.roomID}")
-                await self.session.close()
+            await wait_for(self.request(f"https://chat.stackexchange.com/chats/leave/{self.roomID}"), 3)
+            await wait_for(self.session.close(), 3)
         except TimeoutError:
             pass
 
