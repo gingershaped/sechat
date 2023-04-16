@@ -2,7 +2,7 @@ from typing import Optional, Any, TypeVar
 from collections.abc import Callable, Coroutine, Mapping, Collection
 from time import time
 from logging import Logger, getLogger
-from asyncio import gather, wait_for, CancelledError
+from asyncio import gather, wait_for, CancelledError, timeout
 
 import json
 
@@ -50,8 +50,12 @@ class Room:
 
     async def __aexit__(self, exc_type, exc, tb):
         self.logger.info("Shutting down...")
-        await self.request(f"https://chat.stackexchange.com/chats/leave/{self.roomID}")
-        await self.session.close()
+        try:
+            async with timeout(5):
+                await self.request(f"https://chat.stackexchange.com/chats/leave/{self.roomID}")
+                await self.session.close()
+        except TimeoutError:
+            pass
 
     async def _mentionHandler(self, _, event: MentionEvent):
         await self.session.post(
