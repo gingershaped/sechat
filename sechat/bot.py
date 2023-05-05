@@ -156,12 +156,20 @@ class Bot:
     async def universalLogin(self, host: str):
         return await self.session.post(f"{host}/users/login/universal/request")
 
-    async def authenticate(self, email: str, password: str, host: str):
+    def needsToLogin(self, email: str) -> bool:
+        if self.useCookies:
+            if self.loadCookies(email, self.cookieJar):
+                self.cookieJar._do_expiration()
+                return "acct" not in self.cookieJar._cookies.get(("stackexchange.com", "/"), {})
+        return False
+
+    async def authenticate(self, email: str, password: Optional[str], host: str):
         if self.useCookies:
             if self.loadCookies(email, self.cookieJar):
                 self.logger.debug("Loaded cookies")
         self.cookieJar._do_expiration()
         if "acct" not in self.cookieJar._cookies.get(("stackexchange.com", "/"), {}):
+            assert password is not None, "Cookie expired, must supply password!"
             self.logger.debug("Logging into SE...")
             self.logger.debug("Acquiring fkey...")
             fkey = await self.scrapeFkey()
