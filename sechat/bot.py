@@ -161,7 +161,7 @@ class Bot:
             if self.loadCookies(email, self.cookieJar):
                 self.cookieJar._do_expiration()
                 return "acct" not in self.cookieJar._cookies.get(("stackexchange.com", "/"), {})
-        return False
+        return True
 
     async def authenticate(self, email: str, password: Optional[str], host: str):
         if self.useCookies:
