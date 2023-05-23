@@ -3,8 +3,9 @@ from collections.abc import Mapping
 from logging import Logger, getLogger
 from pathlib import Path
 from os import PathLike, makedirs
-from asyncio import create_task, Task, wait_for, run
+from asyncio import create_task, Task, wait_for, run, CancelledError
 from http.cookies import Morsel
+from functools import partial
 
 import pickle
 
@@ -202,12 +203,24 @@ class Bot:
             }
         )
 
+    def _rejoinRoom(self, room: Room, task: Task):
+        try:
+            if task.exception() != None:
+                self.logger.warning(f"Task for room {room.roomID} exited abnormally. Restarting it.")
+                task = create_task(room.loop(), name=room.logger.name)
+                task.add_done_callback(partial(self._rejoinRoom, room))
+                self.roomTasks[room] = task
+        except CancelledError:
+            pass
+
+
     def joinRoom(self, roomID: int, logger: Optional[Logger] = None) -> Room:
         self.logger.info(f"Joining room {roomID}")
         if not self.fkey or not self.userID:
             raise RuntimeError("Not logged in")
         room = Room(self.cookieJar, self.fkey, self.userID, roomID, logger)
         task = create_task(room.loop(), name=room.logger.name)
+        task.add_done_callback(partial(self._rejoinRoom, room))
         self.rooms[roomID] = room
         self.roomTasks[room] = task
         return room
@@ -228,9 +241,3 @@ class Bot:
         self.logger.info("Shutting down...")
         run(wait_for(self.session.close(), 3))
         self.logger.debug("Shutdown completed!")
-
-    async def checkTasks(self):
-        for task in self.roomTasks.values():
-            if task.done():
-                if (exception := task.exception()) != None:
-                    raise exception
