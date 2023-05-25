@@ -6,6 +6,7 @@ from os import PathLike, makedirs
 from asyncio import create_task, Task, wait_for, run, CancelledError
 from http.cookies import Morsel
 from functools import partial
+from traceback import format_exception
 
 import pickle
 
@@ -207,6 +208,8 @@ class Bot:
         try:
             if task.exception() != None:
                 self.logger.warning(f"Task for room {room.roomID} exited abnormally. Restarting it.")
+                self.logger.warning("Error:")
+                [self.logger.warning(l) for l in format_exception(task.exception())]
                 task = create_task(room.loop(), name=room.logger.name)
                 task.add_done_callback(partial(self._rejoinRoom, room))
                 self.roomTasks[room] = task
