@@ -2,7 +2,7 @@ from typing import Optional, Any, TypeVar
 from collections.abc import Callable, Coroutine, Mapping, Collection
 from time import time
 from logging import Logger, getLogger
-from asyncio import gather, wait_for, CancelledError
+from asyncio import gather, wait_for, CancelledError, Event
 
 import json
 
@@ -32,6 +32,7 @@ class Room:
             self.logger = logger
         else:
             self.logger = getLogger(f"Room-{roomID}")
+        self._connectedEvent = Event()
         self.cookies = cookies
         self.fkey = fkey
         self.userID = userID
@@ -75,6 +76,7 @@ class Room:
         try:
             async for url in self.getSocketUrls():
                 async with connect(url, origin="http://chat.stackexchange.com", close_timeout=3, ping_interval=None) as socket:  # type: ignore It doesn't like the origin header for some reason
+                    self._connectedEvent.set()
                     self.logger.info("Connected!")
                     while True:
                         try:

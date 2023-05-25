@@ -217,7 +217,7 @@ class Bot:
             pass
 
 
-    def joinRoom(self, roomID: int, logger: Optional[Logger] = None) -> Room:
+    async def joinRoom(self, roomID: int, logger: Optional[Logger] = None) -> Room:
         self.logger.info(f"Joining room {roomID}")
         if not self.fkey or not self.userID:
             raise RuntimeError("Not logged in")
@@ -226,6 +226,7 @@ class Bot:
         task.add_done_callback(partial(self._rejoinRoom, room))
         self.rooms[roomID] = room
         self.roomTasks[room] = task
+        await room._connectedEvent.wait()
         return room
 
     def leaveRoom(self, roomID: int):
