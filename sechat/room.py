@@ -32,7 +32,7 @@ class Room:
             self.logger = logger
         else:
             self.logger = getLogger(f"Room-{roomID}")
-        self.session = ClientSession(cookie_jar=cookies)
+        self.cookies = cookies
         self.fkey = fkey
         self.userID = userID
         self.roomID = roomID
@@ -45,10 +45,7 @@ class Room:
     def __hash__(self):
         return hash(self.roomID)
 
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
+    async def shutdown(self):
         self.logger.info("Shutting down...")
         try:
             await wait_for(self.request(f"https://chat.stackexchange.com/chats/leave/{self.roomID}"), 3)
@@ -74,7 +71,8 @@ class Room:
                 yield url
 
     async def loop(self):
-        async with self:
+        self.session = ClientSession(cookie_jar=self.cookies)
+        try:
             async for url in self.getSocketUrls():
                 async with connect(url, origin="http://chat.stackexchange.com", close_timeout=3, ping_interval=None) as socket:  # type: ignore It doesn't like the origin header for some reason
                     self.logger.info("Connected!")
@@ -107,6 +105,8 @@ class Room:
                                 )
                                 continue
                             await self.process(data)
+        finally:
+            await self.shutdown()
 
     async def process(self, data: dict):
         if f"r{self.roomID}" in data:
