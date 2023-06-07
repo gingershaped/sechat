@@ -24,6 +24,8 @@ Presenting sechat: A _better_ Stack Exchange Chat library. Supports such amazing
 
 `Example! <example>`_
 
+`Source Code! <sourcecode>`_
+
 
 
 Indices and tables
