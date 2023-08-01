@@ -1,3 +1,9 @@
+===========
+Source Code
+===========
+
+Here is the main source code to the sechat module:
+
 .. code-block:: python
 
     import websocket #upm package(websocket-client)
