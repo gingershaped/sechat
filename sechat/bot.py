@@ -239,9 +239,7 @@ class Bot:
     def leaveAllRooms(self):
         [self.leaveRoom(room) for room in list(self.rooms.keys())]
 
-    async def __aenter__(self):
-        return self
-    async def __aexit__(self, exc_type, exc, tb):
+    async def shutdown(self):
         self.logger.info("Shutting down...")
         run(wait_for(self.session.close(), 3))
         self.logger.debug("Shutdown completed!")
