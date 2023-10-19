@@ -79,6 +79,7 @@ class MessageEvent(RoomEvent):
 @dataclass
 class EditEvent(MessageEvent):
     message_edits: int = 0
+    target_user_id: int = 0
 
 
 @dataclass
