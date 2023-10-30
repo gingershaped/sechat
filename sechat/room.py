@@ -1,5 +1,5 @@
 from typing import Optional, Any, TypeVar
-from collections.abc import Callable, Coroutine, Mapping, Collection
+from collections.abc import Callable, Coroutine, Collection
 from time import time
 from logging import Logger, getLogger
 from asyncio import gather, wait_for, CancelledError, Event
@@ -142,7 +142,7 @@ class Room:
 
         return _on
 
-    async def request(self, uri: str, data: Mapping[str, Any] = {}):
+    async def request(self, uri: str, data: dict[str, Any] = {}):
         response = await self.session.post(
             uri,
             data=data | {"fkey": self.fkey},
@@ -304,12 +304,12 @@ class Room:
     async def moveMessages(self, messageIDs: Collection[int], roomID: int):
         messageIDs = set(messageIDs)
         self.logger.info(f"Moving messages {messageIDs} to room {roomID}")
-        if result := (
+        if (result := (
             await (
                 await self.request(
                     f"https://chat.stackexchange.com/admin/movePosts/{self.roomID}",
                     {"to": roomID, "ids": ",".join(map(str, messageIDs))},
                 )
             ).text()
-        ) != len(messageIDs):
+        )) != str(len(messageIDs)):
             raise OperationFailedError(result)
