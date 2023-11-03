@@ -241,5 +241,5 @@ class Bot:
 
     async def shutdown(self):
         self.logger.info("Shutting down...")
-        wait_for(self.session.close(), 3)
+        await wait_for(self.session.close(), 3)
         self.logger.debug("Shutdown completed!")
