@@ -3,7 +3,7 @@ from collections.abc import Mapping
 from logging import Logger, getLogger
 from pathlib import Path
 from os import PathLike, makedirs
-from asyncio import create_task, Task, wait_for, run, CancelledError
+from asyncio import create_task, Task, wait_for, CancelledError
 from http.cookies import Morsel
 from functools import partial
 from traceback import format_exception
@@ -241,5 +241,5 @@ class Bot:
 
     async def shutdown(self):
         self.logger.info("Shutting down...")
-        run(wait_for(self.session.close(), 3))
+        wait_for(self.session.close(), 3)
         self.logger.debug("Shutdown completed!")
