@@ -92,6 +92,11 @@ class ReplyEvent(MessageEvent):
     message_edits: int = 0
     target_user_id: int = 0
 
+@dataclass
+class DeleteEvent(RoomEvent):
+    user_id: int
+    user_name: int
+    message_id: int
 
 EVENT_CLASSES = defaultdict(
     lambda: UnknownEvent,
@@ -100,5 +105,6 @@ EVENT_CLASSES = defaultdict(
         EventType.MENTION: MentionEvent,
         EventType.REPLY: ReplyEvent,
         EventType.EDIT: EditEvent,
+        EventType.DELETE: DeleteEvent,
     },
 )
