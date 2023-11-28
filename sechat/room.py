@@ -146,7 +146,8 @@ class Room:
     @backoff(
         runtime,
         RatelimitError,
-        value=lambda e: e.retryAfter
+        value=lambda e: e.retryAfter,
+        jitter=None
     )
     async def request(self, uri: str, data: dict[str, Any] = {}):
         response = await self.session.post(
