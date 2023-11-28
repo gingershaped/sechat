@@ -1,16 +1,17 @@
-from typing import Optional, Any, TypeVar
+from typing import Generator, Optional, Any, TypeVar
 from collections.abc import Callable, Coroutine, Collection
 from time import time
 from logging import Logger, getLogger
 from asyncio import gather, wait_for, CancelledError, Event
 
 import json
+import re
 
 from websockets.client import connect
 from websockets.exceptions import ConnectionClosed
 from aiohttp import ClientSession, CookieJar
 
-from backoff import on_exception as backoff, expo
+from backoff import on_exception as backoff, expo, on_predicate, runtime
 
 from sechat.events import EventBase, MentionEvent, EventType, EVENT_CLASSES
 from sechat.errors import RatelimitError, OperationFailedError
@@ -119,15 +120,14 @@ class Room:
                         if not isinstance(event, dict):
                             continue
                         self.logger.debug(f"Got event data: {event}")
-                        await self.handle(EventType(event["event_type"]), event)
+                        for result in await gather(self.handle(EventType(event["event_type"]), event), return_exceptions=True):
+                            if isinstance(result, Exception):
+                                self.logger.error(f"An exception occured in a handler:", exc_info=result)
 
-    async def handle(self, eventType: EventType, eventData: dict):
-        return await gather(
-            *(
-                handler(self, EVENT_CLASSES[eventType](**eventData))
-                for handler in self.handlers[eventType]
-            )
-        )
+    def handle(self, eventType: EventType, eventData: dict):
+        event = EVENT_CLASSES[eventType](**eventData)
+        for handler in self.handlers[eventType]:
+            yield handler(self, event)
 
     def register(self, handler: EventHandler, eventType: EventType):
         self.handlers[eventType].add(handler)
@@ -142,6 +142,12 @@ class Room:
 
         return _on
 
+            
+    @backoff(
+        runtime,
+        RatelimitError,
+        value=lambda e: e.retryAfter
+    )
     async def request(self, uri: str, data: dict[str, Any] = {}):
         response = await self.session.post(
             uri,
@@ -149,12 +155,15 @@ class Room:
             headers={"Referer": f"https://chat.stackexchange.com/rooms/{self.roomID}"},
         )
         if response.status == 409:
-            raise RatelimitError()
+            match = re.match(r"You can perform this action again in (\d+)", await response.text())
+            if match is None:
+                self.logger.warning(f"Unable to extract retry value from response: {await response.text()}")
+                raise RatelimitError(1)
+            raise RatelimitError(int(match.group(1)))
         elif response.status != 200:
             raise OperationFailedError(response.status, await response.text())
         return response
 
-    @backoff(expo, RatelimitError)
     async def bookmark(self, start: int, end: int, title: str):
         result = await (
             await self.request(
@@ -176,7 +185,6 @@ class Room:
                 raise OperationFailedError(result)
             return True
 
-    @backoff(expo, RatelimitError)
     async def removeBookmark(self, title: str):
         self.logger.info(f"Removing bookmark {title}")
         if not (
@@ -191,8 +199,8 @@ class Room:
         ):
             raise OperationFailedError(result)
 
-    @backoff(expo, RatelimitError)
     async def send(self, message: str) -> int:
+        assert len(message) >= 1, "Message cannot be empty!"
         self.logger.info(f'Sending message "{message}"')
         result = await (
             await self.request(
@@ -209,8 +217,8 @@ class Room:
     async def reply(self, target: int, message: str) -> int:
         return await self.send(f":{target} {message}")
 
-    @backoff(expo, RatelimitError)
     async def edit(self, messageID: int, newMessage: str):
+        assert len(newMessage) >= 1, "Message cannot be empty!"
         self.logger.info(f'Editing message {messageID} to "{newMessage}"')
         if not (
             result := (
@@ -225,7 +233,6 @@ class Room:
         ):
             raise OperationFailedError(result)
 
-    @backoff(expo, RatelimitError)
     async def delete(self, messageID: int):
         self.logger.info(f"Deleting message {messageID}")
         if not (
@@ -240,7 +247,6 @@ class Room:
         ):
             raise OperationFailedError(result)
 
-    @backoff(expo, RatelimitError)
     async def star(self, messageID: int):
         self.logger.info(f"Starring message {messageID}")
         if not (
@@ -255,7 +261,6 @@ class Room:
         ):
             raise OperationFailedError(result)
 
-    @backoff(expo, RatelimitError)
     async def pin(self, messageID: int):
         self.logger.info(f"Pinning message {messageID}")
         if not (
@@ -270,7 +275,6 @@ class Room:
         ):
             raise OperationFailedError(result)
 
-    @backoff(expo, RatelimitError)
     async def unpin(self, messageID: int):
         self.logger.info(f"Unpinning message {messageID}")
         if not (
@@ -285,7 +289,6 @@ class Room:
         ):
             raise OperationFailedError(result)
 
-    @backoff(expo, RatelimitError)
     async def clearStars(self, messageID: int):
         self.logger.info(f"Clearing stars on message {messageID}")
         if not (
@@ -300,7 +303,6 @@ class Room:
         ):
             raise OperationFailedError(result)
 
-    @backoff(expo, RatelimitError)
     async def moveMessages(self, messageIDs: Collection[int], roomID: int):
         messageIDs = set(messageIDs)
         self.logger.info(f"Moving messages {messageIDs} to room {roomID}")
