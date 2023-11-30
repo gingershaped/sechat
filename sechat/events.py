@@ -97,6 +97,7 @@ class DeleteEvent(RoomEvent):
     user_id: int
     user_name: int
     message_id: int
+    message_edits: int = 0
 
 EVENT_CLASSES = defaultdict(
     lambda: UnknownEvent,
