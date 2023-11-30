@@ -13,7 +13,7 @@ websocket-client = "^1.3.0"
 
 [tool.poetry.dev-dependencies]
 # Remember to update docs/build-requirements.txt!
-Sphinx = "^5.0.2"
+Sphinx = "^7.1.2"
 sphinx-rtd-theme = "^1.0.0"
 build = "^0.8.0"
 tomli = "^2.0.1" 
