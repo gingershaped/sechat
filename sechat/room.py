@@ -120,14 +120,14 @@ class Room:
                         if not isinstance(event, dict):
                             continue
                         self.logger.debug(f"Got event data: {event}")
-                        for result in await gather(self.handle(EventType(event["event_type"]), event), return_exceptions=True):
+                        for result in await gather(*self.handle(EventType(event["event_type"]), event), return_exceptions=True):
                             if isinstance(result, Exception):
                                 self.logger.error(f"An exception occured in a handler:", exc_info=result)
 
-    def handle(self, eventType: EventType, eventData: dict):
+    async def handle(self, eventType: EventType, eventData: dict):
         event = EVENT_CLASSES[eventType](**eventData)
         for handler in self.handlers[eventType]:
-            yield await handler(self, event)
+            yield handler(self, event)
 
     def register(self, handler: EventHandler, eventType: EventType):
         self.handlers[eventType].add(handler)
