@@ -120,7 +120,7 @@ class Room:
                         if not isinstance(event, dict):
                             continue
                         self.logger.debug(f"Got event data: {event}")
-                        for result in await gather(*self.handle(EventType(event["event_type"]), event), return_exceptions=True):
+                        for result in await gather(*[i async for i in self.handle(EventType(event["event_type"]), event)], return_exceptions=True):
                             if isinstance(result, Exception):
                                 self.logger.error(f"An exception occured in a handler:", exc_info=result)
 

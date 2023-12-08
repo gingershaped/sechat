@@ -204,17 +204,9 @@ class Bot:
             }
         )
 
-    def _rejoinRoom(self, room: Room, task: Task):
-        try:
-            if task.exception() != None:
-                self.logger.warning(f"Task for room {room.roomID} exited abnormally. Restarting it.")
-                self.logger.warning("Error:")
-                [self.logger.warning(l) for l in format_exception(task.exception())]
-                task = create_task(room.loop(), name=room.logger.name)
-                task.add_done_callback(partial(self._rejoinRoom, room))
-                self.roomTasks[room] = task
-        except CancelledError:
-            pass
+    def _roomExited(self, room: Room, task: Task):
+        if (e := task.exception()) != None:
+            raise e
 
 
     async def joinRoom(self, roomID: int, logger: Optional[Logger] = None) -> Room:
@@ -223,7 +215,7 @@ class Bot:
             raise RuntimeError("Not logged in")
         room = Room(self.cookieJar, self.fkey, self.userID, roomID, logger)
         task = create_task(room.loop(), name=room.logger.name)
-        task.add_done_callback(partial(self._rejoinRoom, room))
+        task.add_done_callback(partial(self._roomExited, room))
         self.rooms[roomID] = room
         self.roomTasks[room] = task
         await room._connectedEvent.wait()
