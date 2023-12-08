@@ -127,7 +127,7 @@ class Room:
     def handle(self, eventType: EventType, eventData: dict):
         event = EVENT_CLASSES[eventType](**eventData)
         for handler in self.handlers[eventType]:
-            yield handler(self, event)
+            yield await handler(self, event)
 
     def register(self, handler: EventHandler, eventType: EventType):
         self.handlers[eventType].add(handler)
