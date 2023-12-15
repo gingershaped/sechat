@@ -70,6 +70,7 @@ class MessageEvent(RoomEvent):
     user_name: str
     parent_id: Optional[int] = None
     show_parent: Any = None  # idfk what this is
+    target_user_id: int = 0
 
     def __post_init__(self, event_type, time_stamp):
         super().__post_init__(event_type, time_stamp)
@@ -79,25 +80,22 @@ class MessageEvent(RoomEvent):
 @dataclass
 class EditEvent(MessageEvent):
     message_edits: int = 0
-    target_user_id: int = 0
-
 
 @dataclass
 class MentionEvent(MessageEvent):
     message_edits: int = 0
-    target_user_id: int = 0
-
+    
 @dataclass
 class ReplyEvent(MessageEvent):
     message_edits: int = 0
-    target_user_id: int = 0
-
+    
 @dataclass
 class DeleteEvent(RoomEvent):
     user_id: int
     user_name: int
     message_id: int
     message_edits: int = 0
+    target_user_id: int = 0
 
 EVENT_CLASSES = defaultdict(
     lambda: UnknownEvent,
