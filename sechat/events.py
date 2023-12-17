@@ -97,7 +97,7 @@ class DeleteEvent(RoomEvent):
     message_edits: int = 0
     target_user_id: Optional[int] = None
     parent_id: Optional[int] = None
-    show_parent: boolean = False
+    show_parent: bool = False
 
 EVENT_CLASSES = defaultdict(
     lambda: UnknownEvent,
