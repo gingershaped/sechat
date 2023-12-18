@@ -2,14 +2,14 @@ from typing import Generator, Optional, Any, TypeVar
 from collections.abc import Callable, Coroutine, Collection
 from time import time
 from logging import Logger, getLogger
-from asyncio import gather, wait_for, CancelledError, Event
+from asyncio import gather, sleep, wait_for, CancelledError, Event
 
 import json
 import re
 
 from websockets.client import connect
 from websockets.exceptions import ConnectionClosed
-from aiohttp import ClientSession, CookieJar
+from aiohttp import ClientConnectionError, ClientSession, CookieJar
 
 from backoff import on_exception as backoff, expo, on_predicate, runtime
 
@@ -57,20 +57,27 @@ class Room:
         self.logger.debug("Shutdown completed!")
 
     async def _mentionHandler(self, _, event: MentionEvent):
-        await self.session.post(
-            "https://chat.stackexchange.com/messages/ack",
-            data={"id": event.message_id, "fkey": self.fkey},
-        )
+        try:
+            await self.session.post(
+                "https://chat.stackexchange.com/messages/ack",
+                data={"id": event.message_id, "fkey": self.fkey},
+            )
+        except:
+            pass
 
     async def getSocketUrls(self):
         while True:
-            async with self.session.post(
-                "https://chat.stackexchange.com/ws-auth",
-                data={"fkey": self.fkey, "roomid": self.roomID},
-            ) as r:
-                url = (await r.json())["url"] + f"?l={int(time())}"
-                self.logger.info(f"Connecting to {url}")
-                yield url
+            try:
+                async with self.session.post(
+                    "https://chat.stackexchange.com/ws-auth",
+                    data={"fkey": self.fkey, "roomid": self.roomID},
+                ) as r:
+                    url = (await r.json())["url"] + f"?l={int(time())}"
+                    self.logger.info(f"Connecting to {url}")
+                    yield url
+            except ClientConnectionError:
+                self.logger.warning("An error occured while fetching the socket, trying again in 3s")
+                await sleep(3)
 
     async def loop(self):
         self.session = ClientSession(cookie_jar=self.cookies)
@@ -150,11 +157,18 @@ class Room:
         jitter=None
     )
     async def request(self, uri: str, data: dict[str, Any] = {}):
-        response = await self.session.post(
-            uri,
-            data=data | {"fkey": self.fkey},
-            headers={"Referer": f"https://chat.stackexchange.com/rooms/{self.roomID}"},
-        )
+        while True:
+            try:
+                response = await self.session.post(
+                    uri,
+                    data=data | {"fkey": self.fkey},
+                    headers={"Referer": f"https://chat.stackexchange.com/rooms/{self.roomID}"},
+                )
+            except ClientConnectionError:
+                self.logger.warning("Connection error, retrying in 3s")
+                await sleep(3)
+            else:
+                break
         if response.status == 409:
             match = re.match(r"You can perform this action again in (\d+)", await response.text())
             if match is None:
