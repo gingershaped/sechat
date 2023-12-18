@@ -81,7 +81,7 @@ class Room:
                     self.logger.info("Connected!")
                     while True:
                         try:
-                            data = await wait_for(socket.recv(), timeout=60)
+                            data = await wait_for(socket.recv(), timeout=300)
                         except ConnectionClosed:
                             self.logger.warning(
                                 "Connection was closed. Attempting to reconnect..."
