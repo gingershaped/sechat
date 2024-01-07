@@ -71,6 +71,7 @@ class MessageEvent(RoomEvent):
     parent_id: Optional[int] = None
     show_parent: Any = None  # idfk what this is
     target_user_id: int = 0
+    message_stars: int = 0
 
     def __post_init__(self, event_type, time_stamp):
         super().__post_init__(event_type, time_stamp)
