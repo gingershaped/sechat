@@ -1,6 +1,6 @@
-from typing import Generator, Optional, Any, TypeVar
+from typing import Optional, Any, TypeVar
 from collections.abc import Callable, Coroutine, Collection
-from time import time
+from time import monotonic, time
 from logging import Logger, getLogger
 from asyncio import gather, sleep, wait_for, CancelledError, Event
 
@@ -11,10 +11,11 @@ from websockets.client import connect
 from websockets.exceptions import ConnectionClosed
 from aiohttp import ClientConnectionError, ClientSession, CookieJar
 
-from backoff import on_exception as backoff, expo, on_predicate, runtime
+from backoff import on_exception as backoff, runtime
 
 from sechat.events import EventBase, MentionEvent, EventType, EVENT_CLASSES
 from sechat.errors import RatelimitError, OperationFailedError
+from sechat.version import __version__
 
 T = TypeVar("T", bound=EventBase)
 EventHandler = Callable[["Room", T], Coroutine]
@@ -50,7 +51,12 @@ class Room:
     async def shutdown(self):
         self.logger.info("Shutting down...")
         try:
-            await wait_for(self.request(f"https://chat.stackexchange.com/chats/leave/{self.roomID}"), 3)
+            await wait_for(
+                self.request(
+                    f"https://chat.stackexchange.com/chats/leave/{self.roomID}"
+                ),
+                3,
+            )
             await wait_for(self.session.close(), 3)
         except TimeoutError:
             pass
@@ -76,19 +82,27 @@ class Room:
                     self.logger.info(f"Connecting to {url}")
                     yield url
             except ClientConnectionError:
-                self.logger.warning("An error occured while fetching the socket, trying again in 3s")
+                self.logger.warning(
+                    "An error occured while fetching the socket, trying again in 3s"
+                )
                 await sleep(3)
 
     async def loop(self):
         self.session = ClientSession(cookie_jar=self.cookies)
+        self.session.headers.update(
+            {
+                "User-Agent": f"Mozilla/5.0 (compatible; automated;) sechat/{__version__} (logged in as user {self.userID}; +http://pypi.org/project/sechat)"
+            }
+        )
         try:
             async for url in self.getSocketUrls():
                 async with connect(url, origin="http://chat.stackexchange.com", close_timeout=3, ping_interval=None) as socket:  # type: ignore It doesn't like the origin header for some reason
                     self._connectedEvent.set()
                     self.logger.info("Connected!")
+                    connectedAt = monotonic()
                     while True:
                         try:
-                            data = await wait_for(socket.recv(), timeout=300)
+                            data = await wait_for(socket.recv(), timeout=45)
                         except ConnectionClosed:
                             self.logger.warning(
                                 "Connection was closed. Attempting to reconnect..."
@@ -115,6 +129,9 @@ class Room:
                                 )
                                 continue
                             await self.process(data)
+                        if monotonic() - connectedAt > 60 * 60 * 2:
+                            self.logger.info(f"Connected for 2 hours, resetting socket")
+                            break
         finally:
             await self.shutdown()
 
@@ -127,14 +144,30 @@ class Room:
                         if not isinstance(event, dict):
                             continue
                         self.logger.debug(f"Got event data: {event}")
-                        for result in await gather(*[i async for i in self.handle(EventType(event["event_type"]), event)], return_exceptions=True):
+                        for result in await gather(
+                            *[
+                                i
+                                async for i in self.handle(
+                                    EventType(event["event_type"]), event
+                                )
+                            ],
+                            return_exceptions=True,
+                        ):
                             if isinstance(result, Exception):
-                                self.logger.error(f"An exception occured in a handler:", exc_info=result)
+                                self.logger.error(
+                                    f"An exception occured in a handler:",
+                                    exc_info=result,
+                                )
 
     async def handle(self, eventType: EventType, eventData: dict):
         event = EVENT_CLASSES[eventType](**eventData)
         for handler in self.handlers[eventType]:
-            yield handler(self, event)
+            try:
+                yield handler(self, event)
+            except Exception:
+                self.logger.exception(
+                    f"Exception occured in handler for {eventType.name}"
+                )
 
     def register(self, handler: EventHandler, eventType: EventType):
         self.handlers[eventType].add(handler)
@@ -149,20 +182,16 @@ class Room:
 
         return _on
 
-            
-    @backoff(
-        runtime,
-        RatelimitError,
-        value=lambda e: e.retryAfter,
-        jitter=None
-    )
+    @backoff(runtime, RatelimitError, value=lambda e: e.retryAfter, jitter=None)
     async def request(self, uri: str, data: dict[str, Any] = {}):
         while True:
             try:
                 response = await self.session.post(
                     uri,
                     data=data | {"fkey": self.fkey},
-                    headers={"Referer": f"https://chat.stackexchange.com/rooms/{self.roomID}"},
+                    headers={
+                        "Referer": f"https://chat.stackexchange.com/rooms/{self.roomID}"
+                    },
                 )
             except ClientConnectionError:
                 self.logger.warning("Connection error, retrying in 3s")
@@ -170,9 +199,13 @@ class Room:
             else:
                 break
         if response.status == 409:
-            match = re.match(r"You can perform this action again in (\d+)", await response.text())
+            match = re.match(
+                r"You can perform this action again in (\d+)", await response.text()
+            )
             if match is None:
-                self.logger.warning(f"Unable to extract retry value from response: {await response.text()}")
+                self.logger.warning(
+                    f"Unable to extract retry value from response: {await response.text()}"
+                )
                 raise RatelimitError(1)
             raise RatelimitError(int(match.group(1)))
         elif response.status != 200:
@@ -321,12 +354,14 @@ class Room:
     async def moveMessages(self, messageIDs: Collection[int], roomID: int):
         messageIDs = set(messageIDs)
         self.logger.info(f"Moving messages {messageIDs} to room {roomID}")
-        if (result := (
-            await (
-                await self.request(
-                    f"https://chat.stackexchange.com/admin/movePosts/{self.roomID}",
-                    {"to": roomID, "ids": ",".join(map(str, messageIDs))},
-                )
-            ).text()
-        )) != str(len(messageIDs)):
+        if (
+            result := (
+                await (
+                    await self.request(
+                        f"https://chat.stackexchange.com/admin/movePosts/{self.roomID}",
+                        {"to": roomID, "ids": ",".join(map(str, messageIDs))},
+                    )
+                ).text()
+            )
+        ) != str(len(messageIDs)):
             raise OperationFailedError(result)

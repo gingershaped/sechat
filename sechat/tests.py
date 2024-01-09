@@ -77,7 +77,7 @@ class T02MultiUserTestCase(unittest.IsolatedAsyncioTestCase):
         cls.gotReply = False
     @classmethod
     async def asyncTearDown(cls):
-        bot2.leaveAllRooms()
+        bot2.closeAllRooms()
         await cls.room.send("Stage 2 complete. DO NOT resume sending messages.")
         await asyncio.sleep(2)
 
@@ -144,11 +144,11 @@ class T04LeaveTestCase(unittest.IsolatedAsyncioTestCase):
         self.room = bot.joinRoom(1)
         await asyncio.sleep(2)
     def test01LeaveRoom(self):
-        bot.leaveRoom(1, True)
+        bot.closeAllRooms(1, True)
         with self.assertRaises(ValueError):
-            bot.leaveRoom(1)
+            bot.closeAllRooms(1)
     def test02LeaveAllRooms(self):
-        bot.leaveAllRooms(True)
+        bot.closeAllRooms(True)
 
     @unittest.skip("Don't want to trigger the captcha")
     def test03Logout(self):

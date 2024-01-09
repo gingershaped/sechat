@@ -1,15 +1,9 @@
-from typing import Optional, cast, DefaultDict
-from collections.abc import Mapping
+from typing import Optional, cast
 from logging import Logger, getLogger
 from pathlib import Path
 from os import PathLike, makedirs
-from asyncio import create_task, Task, wait_for, CancelledError
-from http.cookies import Morsel
+from asyncio import create_task, Task
 from functools import partial
-from traceback import format_exception
-
-import pickle
-
 
 from platformdirs import user_cache_path
 from aiohttp import ClientSession, CookieJar
@@ -37,21 +31,17 @@ class Bot:
             self.cachePath = Path(cachePath)
         else:
             self.cachePath = user_cache_path("sechat", None, __version__)
-        makedirs(self.cachePath, exist_ok = True)
+        makedirs(self.cachePath, exist_ok=True)
 
         self.cookieJar = CookieJar()
-        self.session = ClientSession(cookie_jar = self.cookieJar)
-        self.session.headers.update(
-            {
-                "User-Agent": f"Mozilla/5.0 (compatible; automated;) sechat/{__version__} (unauthenticated; +http://pypi.org/project/sechat)"
-            }
-        )
-
         self.roomTasks: dict[Room, Task] = {}
         self.rooms: dict[int, Room] = {}
 
     def loadCookies(self, email: str, cookies: CookieJar):
-        cookiePath = self.cachePath / f"sechat_cookies_{md5(email.encode('utf-8')).hexdigest()}.dat"
+        cookiePath = (
+            self.cachePath
+            / f"sechat_cookies_{md5(email.encode('utf-8')).hexdigest()}.dat"
+        )
         try:
             cookies.load(cookiePath)
         except FileNotFoundError:
@@ -60,12 +50,15 @@ class Bot:
             return True
 
     def dumpCookies(self, email: str, cookies: CookieJar):
-        cookiePath = self.cachePath / f"sechat_cookies_{md5(email.encode('utf-8')).hexdigest()}.dat"
+        cookiePath = (
+            self.cachePath
+            / f"sechat_cookies_{md5(email.encode('utf-8')).hexdigest()}.dat"
+        )
         cookies.save(cookiePath)
         self.logger.debug(f"Dumped cookies to {cookiePath}")
 
-    async def getChatFkey(self) -> Optional[str]:
-        async with self.session.get(
+    async def getChatFkey(self, session: ClientSession) -> Optional[str]:
+        async with session.get(
             "https://chat.stackexchange.com/chats/join/favorite"
         ) as response:
             soup = BeautifulSoup(
@@ -80,8 +73,8 @@ class Bot:
                                 return "".join(fkey)
                             return fkey
 
-    async def getChatUserId(self) -> Optional[int]:
-        async with self.session.get(
+    async def getChatUserId(self, session: ClientSession) -> Optional[int]:
+        async with session.get(
             "https://chat.stackexchange.com/chats/join/favorite"
         ) as response:
             soup = BeautifulSoup(
@@ -95,8 +88,8 @@ class Bot:
                             href = "".join(href)
                         return int(href.split("/")[2])
 
-    async def scrapeFkey(self) -> Optional[str]:
-        async with self.session.get(
+    async def scrapeFkey(self, session: ClientSession) -> Optional[str]:
+        async with session.get(
             "https://meta.stackexchange.com/users/login"
         ) as response:
             soup = BeautifulSoup(
@@ -109,8 +102,10 @@ class Bot:
                     return "".join(fkey)
                 return fkey
 
-    async def doSELogin(self, host: str, email: str, password: str, fkey: str) -> str:
-        async with self.session.post(
+    async def doSELogin(
+        self, session: ClientSession, host: str, email: str, password: str, fkey: str
+    ) -> str:
+        async with session.post(
             f"{host}/users/login-or-signup/validation/track",
             data={
                 "email": email,
@@ -127,8 +122,10 @@ class Bot:
         ) as response:
             return await response.text()
 
-    async def loadProfile(self, host: str, fkey: str, email: str, password: str):
-        async with self.session.post(
+    async def loadProfile(
+        self, session: ClientSession, host: str, fkey: str, email: str, password: str
+    ):
+        async with session.post(
             f"{host}/users/login",
             params={"ssrc": "head", "returnurl": f"{host}"},
             data={
@@ -155,14 +152,16 @@ class Bot:
                 "Failed to load SE profile: Unable to ascertain success state."
             )
 
-    async def universalLogin(self, host: str):
-        return await self.session.post(f"{host}/users/login/universal/request")
+    async def universalLogin(self, session: ClientSession, host: str):
+        return await session.post(f"{host}/users/login/universal/request")
 
     def needsToLogin(self, email: str) -> bool:
         if self.useCookies:
             if self.loadCookies(email, self.cookieJar):
                 self.cookieJar._do_expiration()
-                return "acct" not in self.cookieJar._cookies.get(("stackexchange.com", "/"), {})
+                return "acct" not in self.cookieJar._cookies.get(
+                    ("stackexchange.com", "/"), {}
+                )
         return True
 
     async def authenticate(self, email: str, password: Optional[str], host: str):
@@ -170,49 +169,52 @@ class Bot:
             if self.loadCookies(email, self.cookieJar):
                 self.logger.debug("Loaded cookies")
         self.cookieJar._do_expiration()
-        if "acct" not in self.cookieJar._cookies.get(("stackexchange.com", "/"), {}):
-            assert password is not None, "Cookie expired, must supply password!"
-            self.logger.debug("Logging into SE...")
-            self.logger.debug("Acquiring fkey...")
-            fkey = await self.scrapeFkey()
-            if not fkey:
-                raise LoginError("Failed to scrape site fkey.")
-            self.logger.debug(f"Acquired fkey: {fkey}")
-            self.logger.info(f"Logging into {host}...")
-            result = await self.doSELogin(host, fkey, email, password)
-            if result != "Login-OK":
-                raise LoginError(f"Site login failed!", result)
-            self.logger.debug(f"Logged into {host}!")
-            self.logger.debug("Loading profile...")
-            await self.loadProfile(host, fkey, email, password)
-            self.logger.debug("Loaded SE profile!")
-            self.logger.debug("Logging into the rest of the network...")
-            await self.universalLogin(host)
-            if self.useCookies:
-                self.logger.debug("Dumping cookies...")
-                self.dumpCookies(email, self.cookieJar)
+        async with ClientSession() as session:
+            session.headers.update(
+                {
+                    "User-Agent": f"Mozilla/5.0 (compatible; automated;) sechat/{__version__} (unauthenticated; +http://pypi.org/project/sechat)"
+                }
+            )
+            if "acct" not in self.cookieJar._cookies.get(("stackexchange.com", "/"), {}):
+                assert password is not None, "Cookie expired, must supply password!"
+                self.logger.debug("Logging into SE...")
+                self.logger.debug("Acquiring fkey...")
+                fkey = await self.scrapeFkey(session)
+                if not fkey:
+                    raise LoginError("Failed to scrape site fkey.")
+                self.logger.debug(f"Acquired fkey: {fkey}")
+                self.logger.info(f"Logging into {host}...")
+                result = await self.doSELogin(session, host, fkey, email, password)
+                if result != "Login-OK":
+                    raise LoginError(f"Site login failed!", result)
+                self.logger.debug(f"Logged into {host}!")
+                self.logger.debug("Loading profile...")
+                await self.loadProfile(session, host, fkey, email, password)
+                self.logger.debug("Loaded SE profile!")
+                self.logger.debug("Logging into the rest of the network...")
+                await self.universalLogin(session, host)
+                if self.useCookies:
+                    self.logger.debug("Dumping cookies...")
+                    self.dumpCookies(email, self.cookieJar)
 
-        self.fkey = await self.getChatFkey()
-        self.userID = await self.getChatUserId()
-        if not self.fkey or not self.userID:
-            raise LoginError("Login failed. Bad email/password?")
-        self.logger.debug(f"Chat fkey is {self.fkey}, user ID is {self.userID}")
-        self.logger.info(f"Logged into {host}!")
-        self.session.headers.update(
-            {
-                "User-Agent": f"Mozilla/5.0 (compatible; automated;) sechat/{__version__} (logged in as user {self.userID}; +http://pypi.org/project/sechat)"
-            }
-        )
+            self.fkey = await self.getChatFkey(session)
+            self.userID = await self.getChatUserId(session)
+            if not self.fkey or not self.userID:
+                raise LoginError("Login failed. Bad email/password?")
+            self.logger.debug(f"Chat fkey is {self.fkey}, user ID is {self.userID}")
+            self.logger.info(f"Logged into {host}!")
 
     def _roomExited(self, room: Room, task: Task):
         if (e := task.exception()) != None:
-            raise e
-
+            self.logger.critical(
+                f"An exception occured in the task of room {room.roomID}"
+            )
 
     async def joinRoom(self, roomID: int, logger: Optional[Logger] = None) -> Room:
         self.logger.info(f"Joining room {roomID}")
         if not self.fkey or not self.userID:
             raise RuntimeError("Not logged in")
+        assert roomID not in self.rooms, "Already in room"
         room = Room(self.cookieJar, self.fkey, self.userID, roomID, logger)
         task = create_task(room.loop(), name=room.logger.name)
         task.add_done_callback(partial(self._roomExited, room))
@@ -221,17 +223,11 @@ class Bot:
         await room._connectedEvent.wait()
         return room
 
-    def leaveRoom(self, roomID: int):
+    async def closeRoom(self, roomID: int):
         self.logger.info(f"Leaving room {roomID}")
-        room = self.rooms[roomID]
-        self.rooms.pop(roomID)
-        task = self.roomTasks.pop(room)
+        task = self.roomTasks.pop(self.rooms.pop(roomID))
         task.cancel()
+        await task
 
-    def leaveAllRooms(self):
-        [self.leaveRoom(room) for room in list(self.rooms.keys())]
-
-    async def shutdown(self):
-        self.logger.info("Shutting down...")
-        await wait_for(self.session.close(), 3)
-        self.logger.debug("Shutdown completed!")
+    async def closeAllRooms(self):
+        [await self.closeRoom(room) for room in list(self.rooms.keys())]
