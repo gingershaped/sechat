@@ -5,6 +5,8 @@ from datetime import datetime
 from collections import defaultdict
 from html import unescape
 
+from jinja2 import pass_context
+
 
 class EventType(Enum):
     MESSAGE = 1
@@ -72,6 +74,7 @@ class MessageEvent(RoomEvent):
     show_parent: Any = None  # idfk what this is
     target_user_id: int = 0
     message_stars: int = 0
+    message_edits: int = 0
 
     def __post_init__(self, event_type, time_stamp):
         super().__post_init__(event_type, time_stamp)
@@ -80,15 +83,15 @@ class MessageEvent(RoomEvent):
 
 @dataclass
 class EditEvent(MessageEvent):
-    message_edits: int = 0
+    pass
 
 @dataclass
 class MentionEvent(MessageEvent):
-    message_edits: int = 0
+    pass
     
 @dataclass
 class ReplyEvent(MessageEvent):
-    message_edits: int = 0
+    pass
     
 @dataclass
 class DeleteEvent(RoomEvent):
