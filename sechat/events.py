@@ -74,6 +74,7 @@ class MessageEvent(RoomEvent):
     show_parent: Any = None  # idfk what this is
     target_user_id: int = 0
     message_stars: int = 0
+    message_owner_stars: int = 0
     message_edits: int = 0
 
     def __post_init__(self, event_type, time_stamp):
