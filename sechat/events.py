@@ -5,9 +5,6 @@ from datetime import datetime
 from collections import defaultdict
 from html import unescape
 
-from jinja2 import pass_context
-
-
 class EventType(Enum):
     MESSAGE = 1
     EDIT = 2
