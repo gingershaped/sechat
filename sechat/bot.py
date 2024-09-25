@@ -172,7 +172,7 @@ class Bot:
         async with ClientSession() as session:
             session.headers.update(
                 {
-                    "User-Agent": f"Mozilla/5.0 (compatible; automated;) sechat/{__version__} (unauthenticated; +http://pypi.org/project/sechat)"
+                    "User-Agent": f"Mozilla/5.0 (compatible; sechat/{__version__}; +http://pypi.org/project/sechat)"
                 }
             )
             if "acct" not in self.cookieJar._cookies.get(("stackexchange.com", "/"), {}):
