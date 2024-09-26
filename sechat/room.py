@@ -24,6 +24,7 @@ EventHandler = Callable[["Room", T], Coroutine]
 class Room:
     def __init__(
         self,
+        server: str,
         cookies: CookieJar,
         fkey: str,
         userID: int,
@@ -35,6 +36,7 @@ class Room:
         else:
             self.logger = getLogger(f"Room-{roomID}")
         self._connectedEvent = Event()
+        self.server = server
         self.cookies = cookies
         self.fkey = fkey
         self.userID = userID
@@ -53,7 +55,7 @@ class Room:
         try:
             await wait_for(
                 self.request(
-                    f"https://chat.stackexchange.com/chats/leave/{self.roomID}"
+                    f"https://{self.server}/chats/leave/{self.roomID}"
                 ),
                 3,
             )
@@ -65,7 +67,7 @@ class Room:
     async def _mentionHandler(self, _, event: MentionEvent):
         try:
             await self.session.post(
-                "https://chat.stackexchange.com/messages/ack",
+                f"https://{self.server}/messages/ack",
                 data={"id": event.message_id, "fkey": self.fkey},
             )
         except:
@@ -75,7 +77,7 @@ class Room:
         while True:
             try:
                 async with self.session.post(
-                    "https://chat.stackexchange.com/ws-auth",
+                    f"https://{self.server}/ws-auth",
                     data={"fkey": self.fkey, "roomid": self.roomID},
                 ) as r:
                     url = (await r.json())["url"] + f"?l={int(time())}"
@@ -96,7 +98,7 @@ class Room:
         )
         try:
             async for url in self.getSocketUrls():
-                async with connect(url, origin="http://chat.stackexchange.com", close_timeout=3, ping_interval=None) as socket:  # type: ignore It doesn't like the origin header for some reason
+                async with connect(url, origin=f"http://{self.server}", close_timeout=3, ping_interval=None) as socket:  # type: ignore It doesn't like the origin header for some reason
                     self._connectedEvent.set()
                     self.logger.info("Connected!")
                     connectedAt = monotonic()
@@ -190,7 +192,7 @@ class Room:
                     uri,
                     data=data | {"fkey": self.fkey},
                     headers={
-                        "Referer": f"https://chat.stackexchange.com/rooms/{self.roomID}"
+                        "Referer": f"https://{self.server}/rooms/{self.roomID}"
                     },
                 )
             except ClientConnectionError:
@@ -215,7 +217,7 @@ class Room:
     async def bookmark(self, start: int, end: int, title: str):
         result = await (
             await self.request(
-                "https://chat.stackexchange.com/conversation/new",
+                f"https://{self.server}/conversation/new",
                 {
                     "roomId": self.roomID,
                     "firstMessageId": start,
@@ -239,7 +241,7 @@ class Room:
             result := (
                 await (
                     await self.request(
-                        f"https://chat.stackexchange.com/conversation/delete/{self.roomID}/{title}"
+                        f"https://{self.server}/conversation/delete/{self.roomID}/{title}"
                     )
                 ).text()
             )
@@ -252,7 +254,7 @@ class Room:
         self.logger.info(f'Sending message "{message}"')
         result = await (
             await self.request(
-                f"https://chat.stackexchange.com/chats/{self.roomID}/messages/new",
+                f"https://{self.server}/chats/{self.roomID}/messages/new",
                 {"text": message},
             )
         ).text()
@@ -272,7 +274,7 @@ class Room:
             result := (
                 await (
                     await self.request(
-                        f"https://chat.stackexchange.com/messages/{messageID}",
+                        f"https://{self.server}/messages/{messageID}",
                         {"text": newMessage},
                     )
                 ).text()
@@ -287,7 +289,7 @@ class Room:
             result := (
                 await (
                     await self.request(
-                        f"https://chat.stackexchange.com/messages/{messageID}/delete"
+                        f"https://{self.server}/messages/{messageID}/delete"
                     )
                 ).text()
             )
@@ -301,7 +303,7 @@ class Room:
             result := (
                 await (
                     await self.request(
-                        f"https://chat.stackexchange.com/messages/{messageID}/star"
+                        f"https://{self.server}/messages/{messageID}/star"
                     )
                 ).text()
             )
@@ -315,7 +317,7 @@ class Room:
             result := (
                 await (
                     await self.request(
-                        f"https://chat.stackexchange.com/messages/{messageID}/owner-star"
+                        f"https://{self.server}/messages/{messageID}/owner-star"
                     )
                 ).text()
             )
@@ -329,7 +331,7 @@ class Room:
             result := (
                 await (
                     await self.request(
-                        f"https://chat.stackexchange.com/messages/{messageID}/unowner-star"
+                        f"https://{self.server}/messages/{messageID}/unowner-star"
                     )
                 ).text()
             )
@@ -343,7 +345,7 @@ class Room:
             result := (
                 await (
                     await self.request(
-                        f"https://chat.stackexchange.com/messages/{messageID}/unstar"
+                        f"https://{self.server}/messages/{messageID}/unstar"
                     )
                 ).text()
             )
@@ -358,7 +360,7 @@ class Room:
             result := (
                 await (
                     await self.request(
-                        f"https://chat.stackexchange.com/admin/movePosts/{self.roomID}",
+                        f"https://{self.server}/admin/movePosts/{self.roomID}",
                         {"to": roomID, "ids": ",".join(map(str, messageIDs))},
                     )
                 ).text()

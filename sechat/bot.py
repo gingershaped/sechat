@@ -18,10 +18,12 @@ from sechat.version import __version__
 class Bot:
     def __init__(
         self,
+        server: str = 'chat.stackexchange.com',
         useCookies: bool = True,
         logger: Optional[Logger] = None,
         cachePath: Optional[PathLike] = None,
     ):
+        self.server = server
         self.useCookies = useCookies
         if logger:
             self.logger = logger
@@ -59,7 +61,7 @@ class Bot:
 
     async def getChatFkey(self, session: ClientSession) -> Optional[str]:
         async with session.get(
-            "https://chat.stackexchange.com/chats/join/favorite"
+            f"https://{self.server}/chats/join/favorite"
         ) as response:
             soup = BeautifulSoup(
                 await response.text(),
@@ -75,7 +77,7 @@ class Bot:
 
     async def getChatUserId(self, session: ClientSession) -> Optional[int]:
         async with session.get(
-            "https://chat.stackexchange.com/chats/join/favorite"
+            f"https://{self.server}/chats/join/favorite"
         ) as response:
             soup = BeautifulSoup(
                 await response.text(),
@@ -206,6 +208,7 @@ class Bot:
 
     def _roomExited(self, room: Room, task: Task):
         if (e := task.exception()) != None:
+            print(e)
             self.logger.critical(
                 f"An exception occured in the task of room {room.roomID}"
             )
@@ -215,7 +218,7 @@ class Bot:
         if not self.fkey or not self.userID:
             raise RuntimeError("Not logged in")
         assert roomID not in self.rooms, "Already in room"
-        room = Room(self.cookieJar, self.fkey, self.userID, roomID, logger)
+        room = Room(self.server, self.cookieJar, self.fkey, self.userID, roomID, logger)
         task = create_task(room.loop(), name=room.logger.name)
         task.add_done_callback(partial(self._roomExited, room))
         self.rooms[roomID] = room
