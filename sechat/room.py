@@ -13,6 +13,7 @@ from aiohttp import ClientConnectionError, ClientSession, CookieJar
 
 from backoff import on_exception as backoff, runtime
 
+from sechat.server import Server
 from sechat.events import EventBase, MentionEvent, EventType, EVENT_CLASSES
 from sechat.errors import RatelimitError, OperationFailedError
 from sechat.version import __version__
@@ -24,7 +25,7 @@ EventHandler = Callable[["Room", T], Coroutine]
 class Room:
     def __init__(
         self,
-        server: str,
+        server: Server,
         cookies: CookieJar,
         fkey: str,
         userID: int,

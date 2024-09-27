@@ -10,15 +10,15 @@ from aiohttp import ClientSession, CookieJar
 from bs4 import BeautifulSoup, Tag
 from hashlib import md5
 
+from sechat.server import Server
 from sechat.room import Room
 from sechat.errors import LoginError
 from sechat.version import __version__
 
-
 class Bot:
     def __init__(
         self,
-        server: str = 'chat.stackexchange.com',
+        server: Server = Server.STACK_EXCHANGE,
         useCookies: bool = True,
         logger: Optional[Logger] = None,
         cachePath: Optional[PathLike] = None,
