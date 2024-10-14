@@ -208,9 +208,8 @@ class Bot:
 
     def _roomExited(self, room: Room, task: Task):
         if (e := task.exception()) != None:
-            print(e)
             self.logger.critical(
-                f"An exception occured in the task of room {room.roomID}"
+                f"An exception occured in the task of room {room.roomID}", exc_info=e
             )
 
     async def joinRoom(self, roomID: int, logger: Optional[Logger] = None) -> Room:
