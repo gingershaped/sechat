@@ -1,11 +1,10 @@
-from typing import Any, Optional
-from enum import Enum
-from dataclasses import dataclass, field, InitVar
-from datetime import datetime
-from collections import defaultdict
-from html import unescape
+from typing import Annotated, Any, Literal, Optional
+from enum import IntEnum
 
-class EventType(Enum):
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+
+
+class EventType(IntEnum):
     MESSAGE = 1
     EDIT = 2
     JOIN = 3
@@ -33,81 +32,53 @@ class EventType(Enum):
     USER_NAME_OR_AVATAR_CHANGE = 34
 
 
-class EventBase:
-    pass
-
-
-class UnknownEvent(EventBase):
-    def __init__(self, **kwargs):
-        self.eventType = EventType(kwargs["event_type"])
-        self.args = kwargs
-
-
-@dataclass
-class Event(EventBase):
-    event_type: InitVar[int]
-    time_stamp: InitVar[int]
+class Event(BaseModel):
     id: int
-    timestamp: datetime = field(init=False)
-
-    def __post_init__(self, event_type, time_stamp):
-        self.eventType = EventType(event_type)
-        self.timestamp = datetime.fromtimestamp(time_stamp)
-
-
-@dataclass
-class RoomEvent(Event):
     room_id: int
-    room_name: int
+    room_name: str
 
 
-@dataclass
-class MessageEvent(RoomEvent):
-    content: str
+class BaseMessageEvent(Event):
     message_id: int
     user_id: int
     user_name: str
+
     parent_id: Optional[int] = None
     show_parent: Any = None  # idfk what this is
     target_user_id: int = 0
+
     message_stars: int = 0
     message_owner_stars: int = 0
     message_edits: int = 0
 
-    def __post_init__(self, event_type, time_stamp):
-        super().__post_init__(event_type, time_stamp)
-        self.content = unescape(self.content)
+
+class DeleteEvent(BaseMessageEvent):
+    event_type: Literal[EventType.DELETE]
 
 
-@dataclass
+class MessageEvent(BaseMessageEvent):
+    event_type: Literal[EventType.MESSAGE]
+    content: str
+
+
 class EditEvent(MessageEvent):
-    pass
+    event_type: Literal[EventType.EDIT]
 
-@dataclass
+
 class MentionEvent(MessageEvent):
-    pass
-    
-@dataclass
-class ReplyEvent(MessageEvent):
-    pass
-    
-@dataclass
-class DeleteEvent(RoomEvent):
-    user_id: int
-    user_name: int
-    message_id: int
-    message_edits: int = 0
-    target_user_id: Optional[int] = None
-    parent_id: Optional[int] = None
-    show_parent: bool = False
+    event_type: Literal[EventType.MENTION]
 
-EVENT_CLASSES = defaultdict(
-    lambda: UnknownEvent,
-    {
-        EventType.MESSAGE: MessageEvent,
-        EventType.MENTION: MentionEvent,
-        EventType.REPLY: ReplyEvent,
-        EventType.EDIT: EditEvent,
-        EventType.DELETE: DeleteEvent,
-    },
+
+class ReplyEvent(MessageEvent):
+    event_type: Literal[EventType.REPLY]
+
+
+class UnknownEvent(Event):
+    event_type: EventType
+    model_config = ConfigDict(extra="allow")
+
+
+Events = DeleteEvent | MessageEvent | EditEvent | MentionEvent | ReplyEvent
+_EventAdapter = TypeAdapter[Event](
+    Annotated[Events, Field(discriminator="event_type")] | UnknownEvent
 )

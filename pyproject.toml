@@ -12,6 +12,9 @@ platformdirs = "^3.0.0"
 websockets = "^10.4"
 aiohttp = "^3.8.3"
 backoff = "^2.2.1"
+lxml = "^5.3.0"
+yarl = "^1.15.2"
+pydantic = "^2.9.2"
 
 [tool.poetry.dev-dependencies]
 # Remember to update docs/build-requirements.txt!
@@ -22,6 +25,9 @@ tomli = "^2.0.1"
 
 [tool.poetry.group.dev.dependencies]
 black = {version = "^23.1.0", allow-prereleases = true}
+
+[tool.isort]
+profile = "black"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

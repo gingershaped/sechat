@@ -1,370 +1,168 @@
-from typing import Optional, Any, TypeVar
-from collections.abc import Callable, Coroutine, Collection
-from time import monotonic, time
-from logging import Logger, getLogger
-from asyncio import gather, sleep, wait_for, CancelledError, Event
-
 import json
 import re
 
-from websockets.client import connect
-from websockets.exceptions import ConnectionClosed
-from aiohttp import ClientConnectionError, ClientSession, CookieJar
+from functools import partialmethod
+from logging import getLogger
+from time import monotonic, time
+from typing import Any, AsyncGenerator, Optional, cast
 
-from backoff import on_exception as backoff, runtime
+from aiohttp import ClientSession
+from backoff import on_exception, runtime
+from bs4 import BeautifulSoup, Tag
+from yarl import URL
 
-from sechat.server import Server
-from sechat.events import EventBase, MentionEvent, EventType, EVENT_CLASSES
-from sechat.errors import RatelimitError, OperationFailedError
-from sechat.version import __version__
+from sechat.credentials import Credentials
+from sechat.errors import OperationFailedError, RatelimitError
+from sechat.events import Event, _EventAdapter, MentionEvent, ReplyEvent
 
-T = TypeVar("T", bound=EventBase)
-EventHandler = Callable[["Room", T], Coroutine]
+RESET_INTERVAL = 60 * 60 * 2
+BACKOFF_RESPONSE = re.compile(r"You can perform this action again in (\d+) seconds?\.")
 
 
 class Room:
-    def __init__(
-        self,
-        server: Server,
-        cookies: CookieJar,
-        fkey: str,
-        userID: int,
-        roomID: int,
-        logger: Optional[Logger] = None,
-    ):
-        if logger:
-            self.logger = logger
-        else:
-            self.logger = getLogger(f"Room-{roomID}")
-        self._connectedEvent = Event()
-        self.server = server
-        self.cookies = cookies
+    class join:
+        def __init__(self, credentials: Credentials, room_id: int):
+            self.credentials = credentials
+            self.room_id = room_id
+
+        async def __aenter__(self):
+            self.session = self.credentials.session()
+            async with self.session.get("/chats/join/favorite") as response:
+                soup = BeautifulSoup(await response.read(), "lxml")
+                assert isinstance(fkey_input := soup.find(id="fkey"), Tag)
+                assert isinstance(fkey := fkey_input.attrs["value"], str)
+            self.room = Room(self.room_id, self.session, fkey)
+            return self.room
+
+        async def __aexit__(self, *args):
+            await self.room.close()
+
+    def __init__(self, room_id: int, session: ClientSession, fkey: str):
+        self.logger = getLogger(__name__).getChild(str(room_id))
+        self.room_id = room_id
+        self.session = session
         self.fkey = fkey
-        self.userID = userID
-        self.roomID = roomID
-        self.lastPing = time()
-        self.handlers: dict[EventType, set[EventHandler]] = {
-            eventType: set() for eventType in EventType
-        }
-        self.register(self._mentionHandler, EventType.MENTION)
 
-    def __hash__(self):
-        return hash(self.roomID)
+    async def close(self):
+        await self._request(f"/chats/leave/{self.room_id}", {"quiet": "true"})
+        await self.session.close()
 
-    async def shutdown(self):
-        self.logger.info("Shutting down...")
-        try:
-            await wait_for(
-                self.request(
-                    f"https://{self.server}/chats/leave/{self.roomID}"
-                ),
-                3,
-            )
-            await wait_for(self.session.close(), 3)
-        except TimeoutError:
-            pass
-        self.logger.debug("Shutdown completed!")
-
-    async def _mentionHandler(self, _, event: MentionEvent):
-        try:
-            await self.session.post(
-                f"https://{self.server}/messages/ack",
-                data={"id": event.message_id, "fkey": self.fkey},
-            )
-        except:
-            pass
-
-    async def getSocketUrls(self):
+    async def _socket_urls(self):
         while True:
-            try:
-                async with self.session.post(
-                    f"https://{self.server}/ws-auth",
-                    data={"fkey": self.fkey, "roomid": self.roomID},
-                ) as r:
-                    url = (await r.json())["url"] + f"?l={int(time())}"
-                    self.logger.info(f"Connecting to {url}")
-                    yield url
-            except ClientConnectionError:
-                self.logger.warning(
-                    "An error occured while fetching the socket, trying again in 3s"
-                )
-                await sleep(3)
+            async with self.session.post(
+                "/ws-auth", data={"fkey": self.fkey, "roomid": self.room_id}
+            ) as response:
+                response.raise_for_status()
+                url = URL((await response.json())["url"]).with_query(l=int(time()))
+            yield url
 
-    async def loop(self):
-        self.session = ClientSession(cookie_jar=self.cookies)
-        self.session.headers.update(
-            {
-                "User-Agent": f"Mozilla/5.0 (compatible; automated;) sechat/{__version__} (logged in as user {self.userID}; +http://pypi.org/project/sechat)"
-            }
-        )
-        try:
-            async for url in self.getSocketUrls():
-                async with connect(url, origin=f"http://{self.server}", close_timeout=3, ping_interval=None) as socket:  # type: ignore It doesn't like the origin header for some reason
-                    self._connectedEvent.set()
-                    self.logger.info("Connected!")
-                    connectedAt = monotonic()
+    async def events(self) -> AsyncGenerator[Event, None]:
+        async with ClientSession(
+            headers=self.session.headers, cookie_jar=self.session.cookie_jar
+        ) as ws_session:
+            async for url in self._socket_urls():
+                async with ws_session.ws_connect(
+                    url, origin=str(self.session._base_url)
+                ) as connection:
+                    self.logger.info(f"Connected to {url}, fkey is {self.fkey}")
+                    connected_at = monotonic()
                     while True:
+                        if monotonic() - connected_at >= RESET_INTERVAL:
+                            self.logger.debug("Resetting socket after reset interval")
+                            break
                         try:
-                            data = await wait_for(socket.recv(), timeout=45)
-                        except ConnectionClosed:
+                            message = cast(
+                                dict, await connection.receive_json(timeout=45)
+                            )
+                        except Exception as e:
                             self.logger.warning(
-                                "Connection was closed. Attempting to reconnect..."
+                                "An exception occured while receiving data:", exc_info=e
                             )
                             break
-                        except TimeoutError:
-                            self.logger.warning(
-                                "No data recieved in a while, the connection may have dropped. Attempting to reconnect..."
-                            )
-                            break
-                        except CancelledError:
-                            raise
-                        except Exception:
-                            self.logger.critical(
-                                "An error occurred while recieving data!"
-                            )
-                            raise
-                        if data is not None and data != "":
-                            try:
-                                data = json.loads(data)
-                            except (json.JSONDecodeError, TypeError):
-                                self.logger.warning(
-                                    f"Recieved malformed packet: {data}"
-                                )
-                                continue
-                            await self.process(data)
-                        if monotonic() - connectedAt > 60 * 60 * 2:
-                            self.logger.info(f"Connected for 2 hours, resetting socket")
-                            break
-        finally:
-            await self.shutdown()
-
-    async def process(self, data: dict):
-        if f"r{self.roomID}" in data:
-            data = data[f"r{self.roomID}"]
-            if data != {}:
-                if "e" in data:
-                    for event in data["e"]:
-                        if not isinstance(event, dict):
-                            continue
-                        self.logger.debug(f"Got event data: {event}")
-                        for result in await gather(
-                            *[
-                                i
-                                async for i in self.handle(
-                                    EventType(event["event_type"]), event
-                                )
-                            ],
-                            return_exceptions=True,
+                        if (
+                            (body := message.get(f"r{self.room_id}")) is not None
+                            and body != {}
+                            and (events := body.get("e")) is not None
                         ):
-                            if isinstance(result, Exception):
-                                self.logger.error(
-                                    f"An exception occured in a handler:",
-                                    exc_info=result,
+                            for event_data in events:
+                                self.logger.debug(
+                                    f"Recieved event data: {event_data!r}"
                                 )
+                                event = _EventAdapter.validate_python(event_data)
+                                if isinstance(event, (MentionEvent, ReplyEvent)):
+                                    await self._request(
+                                        "/messages/ack", {"id": str(event.message_id)}
+                                    )
+                                yield event
 
-    async def handle(self, eventType: EventType, eventData: dict):
-        event = EVENT_CLASSES[eventType](**eventData)
-        for handler in self.handlers[eventType]:
-            try:
-                yield handler(self, event)
-            except Exception:
-                self.logger.exception(
-                    f"Exception occured in handler for {eventType.name}"
-                )
+    @on_exception(runtime, RatelimitError, value=lambda e: e.retryAfter, jitter=None)
+    async def _request(self, url: str, data: dict[str, Any] = {}):
+        async with self.session.post(url, data=data | {"fkey": self.fkey}) as response:
+            text = await response.text()
+            match response.status:
+                case 409:
+                    if (match := BACKOFF_RESPONSE.fullmatch(text)) is None:
+                        self.logger.warning(f"Got 409 with malformed response: {text}")
+                        raise RatelimitError(1)
+                    raise RatelimitError(int(match.group(1)))
+                case 200:
+                    return text
+                case _:
+                    raise OperationFailedError(response.status, text)
 
-    def register(self, handler: EventHandler, eventType: EventType):
-        self.handlers[eventType].add(handler)
-
-    def unregister(self, handler: EventHandler, eventType: EventType):
-        self.handlers[eventType].remove(handler)
-
-    def on(self, eventType: EventType) -> Callable[[EventHandler], EventHandler]:
-        def _on(handler: EventHandler):
-            self.register(handler, eventType)
-            return handler
-
-        return _on
-
-    @backoff(runtime, RatelimitError, value=lambda e: e.retryAfter, jitter=None)
-    async def request(self, uri: str, data: dict[str, Any] = {}):
-        while True:
-            try:
-                response = await self.session.post(
-                    uri,
-                    data=data | {"fkey": self.fkey},
-                    headers={
-                        "Referer": f"https://{self.server}/rooms/{self.roomID}"
-                    },
-                )
-            except ClientConnectionError:
-                self.logger.warning("Connection error, retrying in 3s")
-                await sleep(3)
-            else:
-                break
-        if response.status == 409:
-            match = re.match(
-                r"You can perform this action again in (\d+)", await response.text()
-            )
-            if match is None:
-                self.logger.warning(
-                    f"Unable to extract retry value from response: {await response.text()}"
-                )
-                raise RatelimitError(1)
-            raise RatelimitError(int(match.group(1)))
-        elif response.status != 200:
-            raise OperationFailedError(response.status, await response.text())
-        return response
-
-    async def bookmark(self, start: int, end: int, title: str):
-        result = await (
-            await self.request(
-                f"https://{self.server}/conversation/new",
-                {
-                    "roomId": self.roomID,
-                    "firstMessageId": start,
-                    "lastMessageId": end,
-                    "title": title,
-                },
-            )
-        ).text()
+    async def _json_request(self, url: str, data: dict[str, Any] = {}):
+        response = await self._request(url, data)
         try:
-            result = json.loads(result)
-        except json.JSONDecodeError:
-            raise OperationFailedError(result)
-        else:
-            if not result.get("ok", False):
-                raise OperationFailedError(result)
-            return True
+            return json.loads(response)
+        except json.JSONDecodeError as e:
+            raise OperationFailedError("Failed to decode response", response) from e
 
-    async def removeBookmark(self, title: str):
-        self.logger.info(f"Removing bookmark {title}")
-        if not (
-            result := (
-                await (
-                    await self.request(
-                        f"https://{self.server}/conversation/delete/{self.roomID}/{title}"
-                    )
-                ).text()
+    async def _ok_request(self, url: str, data: dict[str, Any] = {}):
+        if (response := await self._request(url, data)) != "ok":
+            raise OperationFailedError(response)
+
+    async def send(self, message: str, reply_to: Optional[int] = None):
+        if not len(message):
+            raise ValueError("Cannot send an empty message!")
+        if reply_to is not None:
+            message = f":{reply_to} " + message
+        return (
+            await self._json_request(
+                f"/chats/{self.room_id}/messages/new", {"text": message}
             )
-            != "ok"
-        ):
-            raise OperationFailedError(result)
+        )["id"]
 
-    async def send(self, message: str) -> int:
-        assert len(message) >= 1, "Message cannot be empty!"
-        self.logger.info(f'Sending message "{message}"')
-        result = await (
-            await self.request(
-                f"https://{self.server}/chats/{self.roomID}/messages/new",
-                {"text": message},
-            )
-        ).text()
-        try:
-            result = json.loads(result)
-        except json.JSONDecodeError:
-            raise OperationFailedError(result)
-        return result["id"]
+    async def edit(self, message_id: int, new_body: str):
+        await self._ok_request(f"/messages/{message_id}", {"text": new_body})
 
-    async def reply(self, target: int, message: str) -> int:
-        return await self.send(f":{target} {message}")
+    async def _message_unary_op(self, op: str, message_id: int):
+        await self._ok_request(f"/messages/{message_id}/{op}")
 
-    async def edit(self, messageID: int, newMessage: str):
-        assert len(newMessage) >= 1, "Message cannot be empty!"
-        self.logger.info(f'Editing message {messageID} to "{newMessage}"')
-        if not (
-            result := (
-                await (
-                    await self.request(
-                        f"https://{self.server}/messages/{messageID}",
-                        {"text": newMessage},
-                    )
-                ).text()
-            )
-            != "ok"
-        ):
-            raise OperationFailedError(result)
+    star = partialmethod(_message_unary_op, "star")
+    pin = partialmethod(_message_unary_op, "owner-star")
+    unpin = partialmethod(_message_unary_op, "unowner-star")
+    clear_stars = partialmethod(_message_unary_op, "unstar")
 
-    async def delete(self, messageID: int):
-        self.logger.info(f"Deleting message {messageID}")
-        if not (
-            result := (
-                await (
-                    await self.request(
-                        f"https://{self.server}/messages/{messageID}/delete"
-                    )
-                ).text()
-            )
-            != "ok"
-        ):
-            raise OperationFailedError(result)
-
-    async def star(self, messageID: int):
-        self.logger.info(f"Starring message {messageID}")
-        if not (
-            result := (
-                await (
-                    await self.request(
-                        f"https://{self.server}/messages/{messageID}/star"
-                    )
-                ).text()
-            )
-            != "ok"
-        ):
-            raise OperationFailedError(result)
-
-    async def pin(self, messageID: int):
-        self.logger.info(f"Pinning message {messageID}")
-        if not (
-            result := (
-                await (
-                    await self.request(
-                        f"https://{self.server}/messages/{messageID}/owner-star"
-                    )
-                ).text()
-            )
-            != "ok"
-        ):
-            raise OperationFailedError(result)
-
-    async def unpin(self, messageID: int):
-        self.logger.info(f"Unpinning message {messageID}")
-        if not (
-            result := (
-                await (
-                    await self.request(
-                        f"https://{self.server}/messages/{messageID}/unowner-star"
-                    )
-                ).text()
-            )
-            != "ok"
-        ):
-            raise OperationFailedError(result)
-
-    async def clearStars(self, messageID: int):
-        self.logger.info(f"Clearing stars on message {messageID}")
-        if not (
-            result := (
-                await (
-                    await self.request(
-                        f"https://{self.server}/messages/{messageID}/unstar"
-                    )
-                ).text()
-            )
-            != "ok"
-        ):
-            raise OperationFailedError(result)
-
-    async def moveMessages(self, messageIDs: Collection[int], roomID: int):
-        messageIDs = set(messageIDs)
-        self.logger.info(f"Moving messages {messageIDs} to room {roomID}")
+    async def move_messages(self, message_ids: set[int], target_room: int):
         if (
-            result := (
-                await (
-                    await self.request(
-                        f"https://{self.server}/admin/movePosts/{self.roomID}",
-                        {"to": roomID, "ids": ",".join(map(str, messageIDs))},
-                    )
-                ).text()
+            result := await self._request(
+                f"/admin/movePosts/{self.room_id}",
+                {"to": target_room, "ids": ",".join(map(str, message_ids))},
             )
-        ) != str(len(messageIDs)):
-            raise OperationFailedError(result)
+        ) != str(len(message_ids)):
+            raise OperationFailedError("Failed to move some messages", result)
+
+    async def bookmark(self, start_message: int, end_message: int, bookmark_title: str):
+        payload = {
+            "roomId": self.room_id,
+            "firstMessageId": start_message,
+            "lastMessageId": end_message,
+            "title": bookmark_title,
+        }
+        if not (result := await self._json_request("/conversation/new", payload)).get(
+            "ok", False
+        ):
+            raise OperationFailedError("Failed to create bookmark", result)
+
+    async def delete_bookmark(self, title: str):
+        await self._ok_request(f"/conversation/delete/{self.room_id}/{title}")

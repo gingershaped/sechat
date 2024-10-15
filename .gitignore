@@ -10,3 +10,4 @@ venv/
 docs/build
 dist/
 .vscode/
+/*.py
