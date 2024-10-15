@@ -31,15 +31,16 @@ class Room:
                 soup = BeautifulSoup(await response.read(), "lxml")
                 assert isinstance(fkey_input := soup.find(id="fkey"), Tag)
                 assert isinstance(fkey := fkey_input.attrs["value"], str)
-            self.room = Room(self.room_id, self.session, fkey)
+            self.room = Room(self.room_id, self.credentials.user_id, self.session, fkey)
             return self.room
 
         async def __aexit__(self, *args):
             await self.room.close()
 
-    def __init__(self, room_id: int, session: ClientSession, fkey: str):
+    def __init__(self, room_id: int, user_id: int, session: ClientSession, fkey: str):
         self.logger = getLogger(__name__).getChild(str(room_id))
         self.room_id = room_id
+        self.user_id = user_id
         self.session = session
         self.fkey = fkey
 
