@@ -135,13 +135,14 @@ class Room:
     async def edit(self, message_id: int, new_body: str):
         await self._ok_request(f"/messages/{message_id}", {"text": new_body})
 
-    async def _message_unary_op(self, op: str, message_id: int):
+    async def _message_nilad_route(self, op: str, message_id: int):
         await self._ok_request(f"/messages/{message_id}/{op}")
 
-    star = partialmethod(_message_unary_op, "star")
-    pin = partialmethod(_message_unary_op, "owner-star")
-    unpin = partialmethod(_message_unary_op, "unowner-star")
-    clear_stars = partialmethod(_message_unary_op, "unstar")
+    delete = partialmethod(_message_nilad_route, "delete")
+    star = partialmethod(_message_nilad_route, "star")
+    pin = partialmethod(_message_nilad_route, "owner-star")
+    unpin = partialmethod(_message_nilad_route, "unowner-star")
+    clear_stars = partialmethod(_message_nilad_route, "unstar")
 
     async def move_messages(self, message_ids: set[int], target_room: int):
         if (
