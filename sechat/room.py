@@ -1,3 +1,4 @@
+from asyncio import sleep
 import json
 import re
 
@@ -14,6 +15,7 @@ from yarl import URL
 from sechat.credentials import Credentials
 from sechat.errors import OperationFailedError, RatelimitError
 from sechat.events import Event, _EventAdapter, MentionEvent, ReplyEvent
+from sechat.servers import Server
 
 RESET_INTERVAL = 60 * 60 * 2
 BACKOFF_RESPONSE = re.compile(r"You can perform this action again in (\d+) seconds?\.")
@@ -23,11 +25,34 @@ class Room:
     @staticmethod
     async def join(credentials: Credentials, room_id: int):
         session = credentials.session()
-        async with session.get("/chats/join/favorite") as response:
-            soup = BeautifulSoup(await response.read(), "lxml")
-            assert isinstance(fkey_input := soup.find(id="fkey"), Tag)
-            assert isinstance(fkey := fkey_input.attrs["value"], str)
+        fkey = await Credentials.scrape_fkey(session, credentials.server)
         return Room(room_id, credentials.user_id, session, fkey)
+
+    @staticmethod
+    async def anonymous(
+        room_id: int, *, server: Server = Server.STACK_EXCHANGE, poll_interval=2
+    ):
+        async with ClientSession(server) as session:
+            fkey = await Credentials.scrape_fkey(session, server)
+            async with session.post(
+                f"/chats/{room_id}/events",
+                data={"since": 0, "mode": "Messages", "msgCount": 100, "fkey": fkey},
+            ) as response:
+                last_time = (await response.json())["time"]
+            while True:
+                async with session.post(
+                    "/events", data={f"r{room_id}": last_time, "fkey": fkey}
+                ) as response:
+                    if (
+                        payload := cast(dict, await response.json()).get(f"r{room_id}")
+                    ) is None:
+                        continue
+                    if "t" in payload:
+                        last_time = payload["t"]
+                    if "e" in payload:
+                        for event_data in payload["e"]:
+                            yield _EventAdapter.validate_python(event_data)
+                await sleep(poll_interval)
 
     def __init__(self, room_id: int, user_id: int, session: ClientSession, fkey: str):
         self.logger = getLogger(__name__).getChild(str(room_id))

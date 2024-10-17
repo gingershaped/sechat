@@ -47,8 +47,16 @@ class Credentials:
         return ClientSession(self.server, cookies=self.cookies, headers=self.headers)
 
     @staticmethod
+    async def scrape_fkey(session: ClientSession, server: Server):
+        async with session.get("/chats/join/favorite") as response:
+            soup = BeautifulSoup(await response.read(), "lxml")
+            assert isinstance(fkey_input := soup.find(id="fkey"), Tag)
+            assert isinstance(fkey := fkey_input.attrs["value"], str)
+        return fkey
+
+    @staticmethod
     async def authenticate(
-        email: str, password: str, *, server: Server = Server.META_STACK_EXCHANGE
+        email: str, password: str, *, server: Server = Server.STACK_EXCHANGE
     ) -> "Credentials":
         logger.info(f"Logging into {server}")
         chat_user_cookie = "sechatusr" if server == Server.STACK_EXCHANGE else "chatusr"
