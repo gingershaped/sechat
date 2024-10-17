@@ -20,22 +20,14 @@ BACKOFF_RESPONSE = re.compile(r"You can perform this action again in (\d+) secon
 
 
 class Room:
-    class join:
-        def __init__(self, credentials: Credentials, room_id: int):
-            self.credentials = credentials
-            self.room_id = room_id
-
-        async def __aenter__(self):
-            self.session = self.credentials.session()
-            async with self.session.get("/chats/join/favorite") as response:
-                soup = BeautifulSoup(await response.read(), "lxml")
-                assert isinstance(fkey_input := soup.find(id="fkey"), Tag)
-                assert isinstance(fkey := fkey_input.attrs["value"], str)
-            self.room = Room(self.room_id, self.credentials.user_id, self.session, fkey)
-            return self.room
-
-        async def __aexit__(self, *args):
-            await self.room.close()
+    @staticmethod
+    async def join(credentials: Credentials, room_id: int):
+        session = credentials.session()
+        async with session.get("/chats/join/favorite") as response:
+            soup = BeautifulSoup(await response.read(), "lxml")
+            assert isinstance(fkey_input := soup.find(id="fkey"), Tag)
+            assert isinstance(fkey := fkey_input.attrs["value"], str)
+        return Room(room_id, credentials.user_id, session, fkey)
 
     def __init__(self, room_id: int, user_id: int, session: ClientSession, fkey: str):
         self.logger = getLogger(__name__).getChild(str(room_id))
@@ -43,6 +35,12 @@ class Room:
         self.user_id = user_id
         self.session = session
         self.fkey = fkey
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        await self.close()
 
     async def close(self):
         await self._request(f"/chats/leave/{self.room_id}", {"quiet": "true"})
