@@ -142,7 +142,7 @@ class Room:
             raise OperationFailedError("Failed to decode response", response) from e
 
     async def _ok_request(self, url: str, data: dict[str, Any] = {}):
-        if (response := await self._request(url, data)) != "ok":
+        if (response := await self._json_request(url, data)) != "ok":
             raise OperationFailedError(response)
 
     async def send(self, message: str, reply_to: Optional[int] = None):
