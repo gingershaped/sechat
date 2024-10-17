@@ -132,7 +132,9 @@ class Room:
                 case 200:
                     return text
                 case _:
-                    raise OperationFailedError(response.status, text)
+                    raise OperationFailedError(
+                        f"Got non-ok status code {response.status}: {text}"
+                    )
 
     async def _json_request(self, url: str, data: dict[str, Any] = {}):
         response = await self._request(url, data)
@@ -143,7 +145,7 @@ class Room:
 
     async def _ok_request(self, url: str, data: dict[str, Any] = {}):
         if (response := await self._json_request(url, data)) != "ok":
-            raise OperationFailedError(response)
+            raise OperationFailedError(f"Recieved non-ok response: {response}")
 
     async def send(self, message: str, reply_to: Optional[int] = None):
         if not len(message):
