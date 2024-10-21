@@ -92,7 +92,7 @@ class Room:
                     connected_at = monotonic()
                     while True:
                         if monotonic() - connected_at >= RESET_INTERVAL:
-                            self.logger.debug("Resetting socket after reset interval")
+                            self.logger.info("Resetting socket after reset interval")
                             break
                         try:
                             message = cast(
