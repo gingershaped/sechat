@@ -7,7 +7,7 @@ replit.nix
 .config/
 venv/
 *.sh
-docs/build
+site/
 dist/
 .vscode/
 /*.py

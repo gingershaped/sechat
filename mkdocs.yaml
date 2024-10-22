@@ -1,0 +1,37 @@
+site_name: sechat
+site_url: !ENV READTHEDOCS_CANONICAL_URL
+repo_url: https://github.com/gingershaped/sechat
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+
+plugins:
+- search
+- mkdocstrings:
+    handlers:
+      python:
+        import:
+        - https://docs.python.org/3/objects.inv
+        - https://typing.readthedocs.io/en/latest/objects.inv
+        - https://docs.aiohttp.org/en/stable/objects.inv
+        options:
+          show_source: false
+          separate_signature: true
+          show_signature_annotations: true
+          signature_crossrefs: true
+          show_symbol_type_heading: true
+          show_symbol_type_toc: true
+          show_root_toc_entry: false
+          show_root_members_full_path: true
+          heading_level: 3
+
+markdown_extensions:
+- admonition
+- pymdownx.highlight:
+    anchor_linenums: true
+- pymdownx.superfences
+
+extra_javascript:
+- javascript/readthedocs.js
