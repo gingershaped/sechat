@@ -168,7 +168,7 @@ class Room:
                                     )
                                 yield event
 
-    @on_exception(runtime, RatelimitError, value=lambda e: e.retryAfter, jitter=None)
+    @on_exception(runtime, RatelimitError, value=lambda e: e.retry_after, jitter=None)
     async def _request(self, url: str, data: dict[str, Any] = {}):
         async with self._session.post(
             url, data=data | {"fkey": self._fkey}
