@@ -52,7 +52,7 @@ class Room:
 
     @staticmethod
     async def anonymous(
-        room_id: int, *, server: Server = Server.STACK_EXCHANGE, poll_interval=2
+        room_id: int, *, server: Server = Server.STACK_EXCHANGE, poll_interval: int = 2
     ) -> AsyncGenerator[Event, None]:
         """Anonymously poll for events in a room. This method does not require any authentication.
 

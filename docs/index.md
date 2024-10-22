@@ -10,7 +10,7 @@
     The copy of `sechat` on PyPI is no longer updated due to `sechat`'s always-unstable nature. Do not use it; instead, install directly from GitHub.
 
 
-To install `sechat`, use your module manager's system for installing from Git repositories. `sechat` is available on GitHub at [https://github.com/gingershaped/sechat], and the `v3` branch should be used.
+To install `sechat`, use your module manager's system for installing from Git repositories. `sechat` is available on GitHub at <https://github.com/gingershaped/sechat>, and the `v3` branch should be used.
 
 ## Example
 ```py
