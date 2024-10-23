@@ -1,4 +1,5 @@
 import json
+from pprint import pformat
 import re
 from asyncio import sleep
 from functools import partialmethod
@@ -9,6 +10,7 @@ from typing import Any, AsyncGenerator, Optional, cast
 from aiohttp import ClientSession
 from backoff import on_exception, runtime
 from bs4 import BeautifulSoup, Tag
+from pydantic import ValidationError
 from yarl import URL
 
 from sechat.credentials import Credentials
@@ -161,7 +163,11 @@ class Room:
                                 self._logger.debug(
                                     f"Recieved event data: {event_data!r}"
                                 )
-                                event = EventAdapter.validate_python(event_data)
+                                try:
+                                    event = EventAdapter.validate_python(event_data)
+                                except ValidationError as e:
+                                    e.add_note(f"Recieved event data: {pformat(event_data)}")
+                                    raise
                                 if isinstance(event, (MentionEvent, ReplyEvent)):
                                     await self._request(
                                         "/messages/ack", {"id": str(event.message_id)}
