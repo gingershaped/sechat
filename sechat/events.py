@@ -8,60 +8,60 @@ class EventType(IntEnum):
     """The possible events that chat can send, as listed in `master-chat.js`.
     
     Attributes:
-        MESSAGE: A message was sent.
-        EDIT: A message was edited.
-        JOIN: A user joined the room.
-        LEAVE: A user left the room.
-        NAME_CHANGE: The room's visibility, name, tags, or description were changed.
-        MESSAGE_STARRED: A user starred a message.
-        DEBUG: Unknown. `master-chat.js` does not send or handle DEBUG events, and there is no known way to send
+        MessagePosted: A message was sent.
+        MessageEdited: A message was edited.
+        UserEntered: A user joined the room.
+        UserLeft: A user left the room.
+        RoomNameChanged: The room's visibility, name, tags, or description were changed.
+        MessageStarred: A user starred a message.
+        DebugMessage: Unknown. `master-chat.js` does not send or handle DEBUG events, and there is no known way to send
             them manually; however, they have appeared in GDPR datadumps containing information about room edits.
             Further research is needed.
-        MENTION: A message was sent which mentions the current account by username.
-        FLAG: A spam flag was raised. Only recieved by users with 10k or more reputation.
-        DELETE: A message was deleted.
-        FILE_UPLOAD: Unknown. There is unused code in `master-chat.js` that seems to suggest it was possible at
+        UserMentioned: A message was sent which mentions the current account by username.
+        MessageFlagged: A spam flag was raised. Only recieved by users with 10k or more reputation.
+        MessageDeleted: A message was deleted.
+        FileAdded: Unknown. There is unused code in `master-chat.js` that seems to suggest it was possible at
             one point to upload arbitrary files to chat; this may be a relic from that feature.
-        MODERATOR_FLAG: A moderator flag was raised. Details unknown since normal users don't recieve this.
-        SETTINGS_CHANGED: This account's chat settings (such as muted users) were changed.
-        GLOBAL_NOTIFICATION: Unknown.
-        ACCESS_CHANGED: The room's access settings were changed.
-        USER_NOTIFICATION: Unknown.
-        INVITATION: Someone invited this account to a room.
-        REPLY: Someone replied to a message sent by this account.
-        MESSAGE_MOVED_OUT: A message was moved out of this room.
-        MESSAGE_MOVED_IN: A message was moved into this room.
-        TIME_BREAK: This room was placed in timeout by a room owner or moderator.
-        FEED_TICKER: An RSS feed in ticker mode recieved a new event.
-        USER_SUSPENSION: A user was suspended? Details unknown.
-        USER_MERGE: User accounts were merged? Details unknown.
-        USER_NAME_OR_AVATAR_CHANGE: A user's name or avatar was changed.
+        ModeratorFlag: A moderator flag was raised. Details unknown since normal users don't recieve this.
+        UserSettingsChanged: This account's chat settings (such as muted users) were changed.
+        GlobalNotification: Unknown.
+        AccessLevelChanged: This account's access level was changed.
+        UserNotification: Unknown.
+        Invitation: Someone invited this account to a room.
+        MessageReply: Someone replied to a message sent by this account.
+        MessageMovedOut: A message was moved out of this room.
+        MessageMovedIn: A message was moved into this room.
+        TimeBreak: This room was placed in timeout by a room owner or moderator.
+        FeedTicker: An RSS feed in ticker mode recieved a new event.
+        UserSuspended: A user was suspended? Details unknown.
+        UserMerged: User accounts were merged? Details unknown.
+        UserNameOrAvatarChanged: A user's name or avatar was changed.
     """
-    MESSAGE = 1
-    EDIT = 2
-    JOIN = 3
-    LEAVE = 4
-    NAME_CHANGE = 5
-    MESSAGE_STARRED = 6
-    DEBUG = 7
-    MENTION = 8
-    FLAG = 9
-    DELETE = 10
-    FILE_UPLOAD = 11
-    MODERATOR_FLAG = 12
-    SETTINGS_CHANGED = 13
-    GLOBAL_NOTIFICATION = 14
-    ACCESS_CHANGED = 15
-    USER_NOTIFICATION = 16
-    INVITATION = 17
-    REPLY = 18
-    MESSAGE_MOVED_OUT = 19
-    MESSAGE_MOVED_IN = 20
-    TIME_BREAK = 21
-    FEED_TICKER = 22
-    USER_SUSPENSION = 29
-    USER_MERGE = 30
-    USER_NAME_OR_AVATAR_CHANGE = 34
+    MessagePosted = 1
+    MessageEdited = 2
+    UserEntered = 3
+    UserLeft = 4
+    RoomNameChanged = 5
+    MessageStarred = 6
+    DebugMessage = 7
+    UserMentioned = 8
+    MessageFlagged = 9
+    MessageDeleted = 10
+    FileAdded = 11
+    ModeratorFlag = 12
+    UserSettingsChanged = 13
+    GlobalNotification = 14
+    AccessLevelChanged = 15
+    UserNotification = 16
+    Invitation = 17
+    MessageReply = 18
+    MessageMovedOut = 19
+    MessageMovedIn = 20
+    TimeBreak = 21
+    FeedTicker = 22
+    UserSuspended = 29
+    UserMerged = 30
+    UserNameOrAvatarChanged = 34
 
 
 class Event(BaseModel):
@@ -69,15 +69,21 @@ class Event(BaseModel):
 
     Attributes:
         id: The unique id of this event.
+    """
+    id: int
+
+class RoomEvent(Event):
+    """An event pertaining to a specific room.
+    
+    Attributes:
         room_id: The id of the room this event was recieved from.
         room_name: The name of the room this event was recieved from.
     """
-    id: int
     room_id: int
     room_name: str
 
 
-class BaseMessageEvent(Event):
+class BaseMessageEvent(RoomEvent):
     """An action taken on a message.
     
     Attributes:
@@ -108,25 +114,19 @@ class BaseMessageEvent(Event):
     message_owner_stars: int = 0
     message_edits: int = 0
 
-
-class DeleteEvent(BaseMessageEvent):
-    """A message was deleted."""
-    event_type: Literal[EventType.DELETE]
-
-
 class MessageEvent(BaseMessageEvent):
     """A message was sent.
     
     Attributes:
         content: The content of the message, as a snippet of HTML.
     """
-    event_type: Literal[EventType.MESSAGE]
+    event_type: Literal[EventType.MessagePosted]
     content: str
 
 
 class EditEvent(MessageEvent):
     """A message was edited."""
-    event_type: Literal[EventType.EDIT]
+    event_type: Literal[EventType.MessageEdited]
 
 
 class MentionEvent(MessageEvent):
@@ -134,7 +134,11 @@ class MentionEvent(MessageEvent):
     
     This event will be sent along with a MessageEvent if someone mentioned the bot in a message.
     """
-    event_type: Literal[EventType.MENTION]
+    event_type: Literal[EventType.UserMentioned]
+
+class DeleteEvent(BaseMessageEvent):
+    """A message was deleted."""
+    event_type: Literal[EventType.MessageDeleted]
 
 
 class ReplyEvent(MessageEvent):
@@ -142,7 +146,7 @@ class ReplyEvent(MessageEvent):
     
     This event will be sent along with a MessageEvent if someone replied to a message sent by the bot.
     """
-    event_type: Literal[EventType.REPLY]
+    event_type: Literal[EventType.MessageReply]
 
 
 class UnknownEvent(Event):
@@ -156,11 +160,10 @@ class UnknownEvent(Event):
     """
 
     event_type: EventType
-    #: :meta private:
     model_config = ConfigDict(extra="allow")
 
 
-Events = DeleteEvent | MessageEvent | EditEvent | MentionEvent | ReplyEvent
+Events = MessageEvent | EditEvent | MentionEvent | DeleteEvent | ReplyEvent
 EventAdapter = TypeAdapter[Event](
     Annotated[Events, Field(discriminator="event_type")] | UnknownEvent
 )
