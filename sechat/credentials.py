@@ -125,9 +125,7 @@ class Credentials:
                 },
             ) as response:
                 if response.status != 200:
-                    raise LoginError(
-                        "Failed to login!", response.status, await response.text()
-                    )
+                    raise LoginError(f"MSE responded with a non-ok status code {response.status} {response.reason}")
             async with qa_session.post(
                 "/users/login",
                 data={
