@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 class EventType(IntEnum):
     """The possible events that chat can send, as listed in `master-chat.js`.
-    
+
     Attributes:
         MessagePosted: A message was sent.
         MessageEdited: A message was edited.
@@ -37,6 +37,7 @@ class EventType(IntEnum):
         UserMerged: User accounts were merged? Details unknown.
         UserNameOrAvatarChanged: A user's name or avatar was changed.
     """
+
     MessagePosted = 1
     MessageEdited = 2
     UserEntered = 3
@@ -70,22 +71,25 @@ class Event(BaseModel):
     Attributes:
         id: The unique id of this event.
     """
+
     id: int
+
 
 class RoomEvent(Event):
     """An event pertaining to a specific room.
-    
+
     Attributes:
         room_id: The id of the room this event was recieved from.
         room_name: The name of the room this event was recieved from.
     """
+
     room_id: int
     room_name: str
 
 
 class BaseMessageEvent(RoomEvent):
     """An action taken on a message.
-    
+
     Attributes:
         message_id: The id of the message.
         user_id: The id of the user who triggered this event.
@@ -102,6 +106,7 @@ class BaseMessageEvent(RoomEvent):
             It is unknown if it can be greater than 1.
         message_edits: The number of times this message has been edited.
     """
+
     message_id: int
     user_id: int
     user_name: str
@@ -114,45 +119,52 @@ class BaseMessageEvent(RoomEvent):
     message_owner_stars: int = 0
     message_edits: int = 0
 
+
 class MessageEvent(BaseMessageEvent):
     """A message was sent.
-    
+
     Attributes:
         content: The content of the message, as a snippet of HTML.
     """
+
     event_type: Literal[EventType.MessagePosted]
     content: str
 
 
 class EditEvent(MessageEvent):
     """A message was edited."""
+
     event_type: Literal[EventType.MessageEdited]
 
 
 class MentionEvent(MessageEvent):
     """The bot was mentioned in a message.
-    
+
     This event will be sent along with a MessageEvent if someone mentioned the bot in a message.
     """
+
     event_type: Literal[EventType.UserMentioned]
+
 
 class DeleteEvent(BaseMessageEvent):
     """A message was deleted."""
+
     event_type: Literal[EventType.MessageDeleted]
 
 
 class ReplyEvent(MessageEvent):
     """The bot was replied to.
-    
+
     This event will be sent along with a MessageEvent if someone replied to a message sent by the bot.
     """
+
     event_type: Literal[EventType.MessageReply]
 
 
 class UnknownEvent(Event):
     """
     An undocumented event.
-    
+
     Instances of this class will have additional properties matching the JSON recieved by the library.
 
     Attributes:

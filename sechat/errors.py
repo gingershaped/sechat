@@ -34,4 +34,6 @@ class OperationFailedError(ChatException):
     def __init__(self, message: str, payload: Optional[Any] = None):
         super().__init__(message)
         if payload is not None:
-            self.add_note(f"Chat responded with the following payload:\n{pformat(payload)}")
+            self.add_note(
+                f"Chat responded with the following payload:\n{pformat(payload)}"
+            )

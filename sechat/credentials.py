@@ -24,7 +24,7 @@ logger = getLogger(__name__)
 @dataclass
 class Credentials:
     """Cookies necessary to interact with Stack Exchange chat.
-    
+
     It is strongly recommended to use [`load_or_authenticate`][sechat.Credentials.load_or_authenticate]
     instead of just [`authenticate`][sechat.Credentials.authenticate], because Stack Exchange will present
     you with a CAPTCHA if you make too many login attempts in too short of a time. `load_and_authenticate`
@@ -76,7 +76,7 @@ class Credentials:
         email: str, password: str, *, server: Server = Server.STACK_EXCHANGE
     ) -> "Credentials":
         """Log into a chat server.
-        
+
         Every time this function is called it will perform the entire login process again, which will
         trigger a CAPTCHA if done too many times. Unless you need complete control over the login process,
         use [`load_or_authenticate`][sechat.Credentials.load_or_authenticate] instead.
@@ -86,14 +86,14 @@ class Credentials:
             email: The email address of the account to log into.
             password: The password of the account to log into.
             server: The chat server to log into.
-        
+
         Returns:
             A new `Credentials` instance that can be used to join chatrooms.
 
         Raises:
             LoginError: Something went wrong while logging in, most likely a CAPTCHA or incorrect credentials.
         """
-        
+
         logger.info(f"Logging into {server}")
         chat_user_cookie = "sechatusr" if server == Server.STACK_EXCHANGE else "chatusr"
 
@@ -125,7 +125,9 @@ class Credentials:
                 },
             ) as response:
                 if response.status != 200:
-                    raise LoginError(f"MSE responded with a non-ok status code {response.status} {response.reason}")
+                    raise LoginError(
+                        f"MSE responded with a non-ok status code {response.status} {response.reason}"
+                    )
             async with qa_session.post(
                 "/users/login",
                 data={
@@ -185,7 +187,7 @@ class Credentials:
 
     def save(self, path: "FileDescriptorOrPath") -> None:
         """Save a `Credentials` instance to a file.
-        
+
         Args:
             path: The file descriptor or path to save to.
         """
@@ -196,7 +198,7 @@ class Credentials:
     @staticmethod
     async def load(path: "FileDescriptorOrPath") -> Optional["Credentials"]:
         """Read and validate a `Credentials` instance from a file.
-        
+
         Args:
             path: The file descriptor or path to load from.
 

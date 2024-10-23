@@ -166,7 +166,9 @@ class Room:
                                 try:
                                     event = EventAdapter.validate_python(event_data)
                                 except ValidationError as e:
-                                    e.add_note(f"Recieved event data:\n{pformat(event_data)}")
+                                    e.add_note(
+                                        f"Recieved event data:\n{pformat(event_data)}"
+                                    )
                                     raise
                                 if isinstance(event, (MentionEvent, ReplyEvent)):
                                     await self._request(
@@ -189,7 +191,10 @@ class Room:
                 case 200:
                     return text
                 case _:
-                    raise OperationFailedError(f"Got non-ok status code {response.status} ({response.reason})", text)
+                    raise OperationFailedError(
+                        f"Got non-ok status code {response.status} ({response.reason})",
+                        text,
+                    )
 
     async def _json_request(self, url: str, data: dict[str, Any] = {}):
         response = await self._request(url, data)
