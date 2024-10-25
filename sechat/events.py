@@ -172,6 +172,22 @@ class DeleteEvent(BaseMessageEvent):
     event_type: Literal[EventType.MessageDeleted]
 
 
+class AccessLevelChangedEvent(UserEvent):
+    """A user's access level was changed.
+
+    [`user_id`][sechat.events.UserEvent.user_id] and [`user_name`][sechat.events.UserEvent.user_name] will be the
+    user id and username of the user which performed the change; [`target_user_id`][sechat.events.UserEvent.target_user_id]
+    will be the user id of the user whose access level was changed.
+
+    Attributes:
+        content: A short string describing what change occured, which appears under certain conditions in
+            chat's UI. TODO: Investigate what those conditions are, see also https://meta.stackexchange.com/q/402787/1116284
+    """
+
+    event_type: Literal[EventType.AccessLevelChanged]
+    content: str
+
+
 class ReplyEvent(MessageEvent):
     """The bot was replied to.
 
@@ -195,7 +211,16 @@ class UnknownEvent(Event):
     model_config = ConfigDict(extra="allow")
 
 
-Events = MessageEvent | EditEvent | UserEnteredEvent | UserLeftEvent | MentionEvent | DeleteEvent | ReplyEvent
+Events = (
+    MessageEvent
+    | EditEvent
+    | UserEnteredEvent
+    | UserLeftEvent
+    | MentionEvent
+    | DeleteEvent
+    | AccessLevelChangedEvent
+    | ReplyEvent
+)
 EventAdapter = TypeAdapter[Event](
     Annotated[Events, Field(discriminator="event_type")] | UnknownEvent
 )
