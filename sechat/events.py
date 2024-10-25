@@ -188,6 +188,23 @@ class AccessLevelChangedEvent(UserEvent):
     content: str
 
 
+class InvitationEvent(UserEvent):
+    """Someone invited this account to a room.
+
+    [`room_id`][sechat.events.RoomEvent.room_id] and [`room_name`][sechat.events.RoomEvent.room_name] will be the
+    id and name of the room this account was invited to join. [`user_id`][sechat.events.UserEvent.user_id]
+    and [`user_name`][sechat.events.UserEvent.user_name] will be the user id and username of the user which
+    sent the invite; [`target_user_id`][sechat.events.UserEvent.target_user_id] will be the user id of this account.
+
+    Attributes:
+        content: A snippet of HTML containing the human-readable invite message which would be shown as a notification
+            in the chat client.
+    """
+
+    event_type: Literal[EventType.Invitation]
+    content: str
+
+
 class ReplyEvent(MessageEvent):
     """The bot was replied to.
 
@@ -219,6 +236,7 @@ Events = (
     | MentionEvent
     | DeleteEvent
     | AccessLevelChangedEvent
+    | InvitationEvent
     | ReplyEvent
 )
 EventAdapter = TypeAdapter[Event](
