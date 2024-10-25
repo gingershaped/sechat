@@ -196,8 +196,6 @@ class AccessLevelChangedEvent(UserEvent):
         TODO investigate this more.
     - `priv <number> deleted`: The user's kickmute expired.
 
-    For kickmute events, `user_id` will be `-2` (for Feeds).
-
     Attributes:
         content: A short string describing what change occured, which appears under certain conditions in
             chat's UI. TODO: Investigate what those conditions are, see also https://meta.stackexchange.com/q/402787/1116284
@@ -206,6 +204,25 @@ class AccessLevelChangedEvent(UserEvent):
     event_type: Literal[EventType.AccessLevelChanged]
     content: str
 
+class UserNotificationEvent(UserEvent):
+    """One of several events occured which chat displays notifications for.
+    
+    Known actions which can fire this event:
+    - A user requesting access to a gallery room which this account owns. The triggering user will be
+        the user which requested access.
+    - A user being kicked from a room which this account owns. The triggering user will be Feeds (user -2).
+
+    [`user_id`][sechat.events.UserEvent.user_id] and [`user_name`][sechat.events.UserEvent.user_name] will be the
+    user id and username of the user which _triggered_ the event; [`target_user_id`][sechat.events.UserEvent.target_user_id]
+    will be the user id of this account.
+
+    Attributes:
+        content: A snippet of HTML containing the human-readable invite message which would be shown as a notification
+            in the chat client.
+    """
+
+    event_type: Literal[EventType.UserNotification]
+    content: str
 
 class InvitationEvent(UserEvent):
     """Someone invited this account to a room.
@@ -272,6 +289,7 @@ Events = (
     | MentionEvent
     | DeleteEvent
     | AccessLevelChangedEvent
+    | UserNotificationEvent
     | InvitationEvent
     | ReplyEvent
     | UserSuspendedEvent
