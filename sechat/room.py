@@ -33,7 +33,7 @@ class Room:
         Do not directly construct this class; use [`join`][sechat.Room.join] instead.
     Attributes:
         room_id: The unique id of this room.
-        user_id: The unique id of the bot user. See [sechat.Credentials.user_id][].
+        user_id: The unique id of the bot user.
     """
 
     @staticmethod

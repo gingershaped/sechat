@@ -189,6 +189,7 @@ class AccessLevelChangedEvent(UserEvent):
     `target_user_id` will be the user id of the user whose access level was changed.
 
     Known values for `content`:
+    
     * `Access now read-write`: The user was explicitly given write access. In gallery rooms, this allows
         the user to chat. This level does nothing in public rooms, unless the user has less than
         20 network-wide reputation, in which case they may be granted this level by a moderator to override
