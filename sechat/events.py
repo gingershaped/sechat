@@ -101,7 +101,7 @@ class UserEvent(RoomEvent):
     target_user_id: Optional[int] = None
 
 
-class BaseMessageEvent(UserEvent):
+class BaseMessageEvent(RoomEvent):
     """An action taken on a message.
 
     Attributes:
@@ -109,10 +109,8 @@ class BaseMessageEvent(UserEvent):
         parent_id: Either the id of the message this message is replying to, or the id of the last message sent by the
             user this message mentions. This will be `None` if the message doesn't reply to another message
             or doesn't ping exactly one user.
-        show_parent: The exact behavior of this property is unknown. It seems to be `true` if this message is replying
+        show_parent: The exact behavior of this property is unknown. It seems to be `True` if this message is replying
             to another message, and `None` otherwise.
-        target_user_id: If this event was triggered by a moderator editing or deleting another user's message,
-            this is the id of the user who sent the message. It is `None` otherwise.
         message_stars: The number of stars this message has.
         message_owner_stars: If this message is pinned this will be 1, otherwise it will be 0.
             It is unknown if it can be greater than 1.
@@ -128,7 +126,7 @@ class BaseMessageEvent(UserEvent):
     message_edits: int = 0
 
 
-class MessageEvent(BaseMessageEvent):
+class MessageEvent(BaseMessageEvent, UserEvent):
     """A message was sent.
 
     Attributes:
@@ -157,6 +155,18 @@ class UserLeftEvent(UserEvent):
     event_type: Literal[EventType.UserLeft]
 
 
+class MessageStarredEvent(BaseMessageEvent):
+    """Someone starred or pinned a message.
+
+    [`message_stars`][sechat.events.BaseMessageEvent.message_stars] and
+    [`message_owner_stars`][sechat.events.BaseMessageEvent.message_owner_stars] will reflect the new star count
+    and pin state of this message. This event no longer includes information about who starred or pinned the message;
+    see https://meta.stackexchange.com/q/229913/1116284.
+    """
+
+    event_type: Literal[EventType.MessageStarred]
+
+
 class MentionEvent(MessageEvent):
     """The bot was mentioned in a message.
 
@@ -166,7 +176,7 @@ class MentionEvent(MessageEvent):
     event_type: Literal[EventType.UserMentioned]
 
 
-class DeleteEvent(BaseMessageEvent):
+class DeleteEvent(BaseMessageEvent, UserEvent):
     """A message was deleted."""
 
     event_type: Literal[EventType.MessageDeleted]
