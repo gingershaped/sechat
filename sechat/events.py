@@ -26,7 +26,7 @@ class EventType(IntEnum):
         UserSettingsChanged: This account's chat settings (such as muted users) were changed.
         GlobalNotification: Unknown.
         AccessLevelChanged: This account's access level was changed.
-        UserNotification: Unknown.
+        UserNotification: One of several events happened which shows a notification in the client.
         Invitation: Someone invited this account to a room.
         MessageReply: Someone replied to a message sent by this account.
         MessageMovedOut: A message was moved out of this room.
@@ -188,6 +188,15 @@ class AccessLevelChangedEvent(UserEvent):
     user id and username of the user which performed the change; [`target_user_id`][sechat.events.UserEvent.target_user_id]
     will be the user id of the user whose access level was changed.
 
+    Known values for `content`:
+    - `Access now read-write`: The user was explicitly given write access
+    - `Access now read-only`: The user was explicitly given read access, such as for a private room
+    - `Access now request`: The user requested access to a gallery room
+    - `priv <number> created`: The user was kicked from the room. This may fire under other conditions as well;
+        TODO investigate this more.
+    - `priv <number> deleted`: The user's kickmute expired.
+
+    For kickmute events, `user_id` will be `-2` (for Feeds).
 
     Attributes:
         content: A short string describing what change occured, which appears under certain conditions in
@@ -216,12 +225,28 @@ class InvitationEvent(UserEvent):
 
 
 class ReplyEvent(MessageEvent):
-    """The bot was replied to.
+    """This account was replied to.
 
     This event will be sent along with a MessageEvent if someone replied to a message sent by the bot.
     """
 
     event_type: Literal[EventType.MessageReply]
+
+class UserSuspendedEvent(UserEvent):
+    """This account was suspended from chat.
+    
+    This is usually not a good event to recieve. [`user_id`][sechat.events.UserEvent.user_id]
+    and [`user_name`][sechat.events.UserEvent.user_name] will be the user id and username of the moderator which
+    created the suspension; [`target_user_id`][sechat.events.UserEvent.target_user_id] will be the user id of this account.
+
+    Attributes:
+        content: A string containing an unknown number, then a space, then a JSON object with two keys: `old` and `new`.
+            `old` is when the previous suspension expires, which will be `null` if this account is not suspended;
+            `new` is when the current suspension expires, which will be `null` if the suspension was cleared.
+    """
+
+    event_type: Literal[EventType.UserSuspended]
+    content: str
 
 
 class UnknownEvent(Event):
@@ -243,11 +268,13 @@ Events = (
     | EditEvent
     | UserEnteredEvent
     | UserLeftEvent
+    | MessageStarredEvent
     | MentionEvent
     | DeleteEvent
     | AccessLevelChangedEvent
     | InvitationEvent
     | ReplyEvent
+    | UserSuspendedEvent
 )
 EventAdapter = TypeAdapter[Event](
     Annotated[Events, Field(discriminator="event_type")] | UnknownEvent
