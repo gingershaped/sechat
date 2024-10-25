@@ -111,9 +111,8 @@ class BaseMessageEvent(RoomEvent):
             or doesn't ping exactly one user.
         show_parent: The exact behavior of this property is unknown. It seems to be `True` if this message is replying
             to another message, and `None` otherwise.
-        message_stars: The number of stars this message has.
-        message_owner_stars: If this message is pinned this will be 1, otherwise it will be 0.
-            It is unknown if it can be greater than 1.
+        message_stars: The number of stars this message has. This will be 0 if the message is not starred.
+        message_owner_stars: The number of pins this message has. This will be 0 if the message is not pinned.
         message_edits: The number of times this message has been edited.
     """
 
