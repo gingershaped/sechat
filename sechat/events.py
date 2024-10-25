@@ -272,6 +272,14 @@ class UserSuspendedEvent(UserEvent):
     event_type: Literal[EventType.UserSuspended]
     content: str
 
+class UserNameOrAvatarChangedEvent(UserEvent):
+    """Someone's user details changed.
+    
+    [`user_id`][sechat.events.UserEvent.user_id] will be -2 (Feeds); [`target_user_id`][sechat.events.UserEvent.target_user_id]
+    will be the id of the user whose details changed.
+    """
+
+    event_type: Literal[EventType.UserNameOrAvatarChanged]
 
 class UnknownEvent(Event):
     """
@@ -300,6 +308,7 @@ Events = (
     | InvitationEvent
     | ReplyEvent
     | UserSuspendedEvent
+    | UserNameOrAvatarChangedEvent
 )
 EventAdapter = TypeAdapter[Event](
     Annotated[Events, Field(discriminator="event_type")] | UnknownEvent
