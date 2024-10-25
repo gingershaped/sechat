@@ -188,6 +188,7 @@ class AccessLevelChangedEvent(UserEvent):
     user id and username of the user which performed the change; [`target_user_id`][sechat.events.UserEvent.target_user_id]
     will be the user id of the user whose access level was changed.
 
+
     Attributes:
         content: A short string describing what change occured, which appears under certain conditions in
             chat's UI. TODO: Investigate what those conditions are, see also https://meta.stackexchange.com/q/402787/1116284
