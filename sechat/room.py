@@ -161,13 +161,13 @@ class Room:
                         ):
                             for event_data in events:
                                 self._logger.debug(
-                                    f"Recieved event data: {event_data!r}"
+                                    f"received event data: {event_data!r}"
                                 )
                                 try:
                                     event = EventAdapter.validate_python(event_data)
                                 except ValidationError as e:
                                     e.add_note(
-                                        f"Recieved event data:\n{pformat(event_data)}"
+                                        f"received event data:\n{pformat(event_data)}"
                                     )
                                     raise
                                 if isinstance(event, (MentionEvent, ReplyEvent)):
@@ -205,7 +205,7 @@ class Room:
 
     async def _ok_request(self, url: str, data: dict[str, Any] = {}):
         if (response := await self._json_request(url, data)) != "ok":
-            raise OperationFailedError(f"Recieved non-ok response", response)
+            raise OperationFailedError(f"received non-ok response", response)
 
     async def send(self, message: str, reply_to: Optional[int] = None) -> int:
         """Send a message.

@@ -19,11 +19,11 @@ class EventType(IntEnum):
             them manually; however, they have appeared in GDPR datadumps containing information about room edits.
             Further research is needed.
         UserMentioned: A message was sent which mentions the current account by username.
-        MessageFlagged: A spam flag was raised. Only recieved by users with 10k or more reputation.
+        MessageFlagged: A spam flag was raised. Only received by users with 10k or more reputation.
         MessageDeleted: A message was deleted.
         FileAdded: Unknown. There is unused code in `master-chat.js` that seems to suggest it was possible at
             one point to upload arbitrary files to chat; this may be a relic from that feature.
-        ModeratorFlag: A moderator flag was raised. Details unknown since normal users don't recieve this.
+        ModeratorFlag: A moderator flag was raised. Details unknown since normal users don't receive this.
         UserSettingsChanged: This account's chat settings (such as muted users) were changed.
         GlobalNotification: Unknown.
         AccessLevelChanged: This account's access level was changed.
@@ -34,7 +34,7 @@ class EventType(IntEnum):
         MessageMovedIn: A message was moved into this room.
         TimeBreak: This room was placed in timeout by a room owner or moderator. This event does not appear
             to actually fire.
-        FeedTicker: An RSS feed in ticker mode recieved a new event.
+        FeedTicker: An RSS feed in ticker mode received a new event.
         UserSuspended: This account was suspended.
         UserMerged: User accounts were merged? Details unknown.
         UserNameOrAvatarChanged: A user's name or avatar was changed.
@@ -68,7 +68,7 @@ class EventType(IntEnum):
 
 
 class Event(BaseModel):
-    """An event recieved from chat.
+    """An event received from chat.
 
     Attributes:
         id: The unique id of this event.
@@ -81,8 +81,8 @@ class RoomEvent(Event):
     """An event pertaining to a specific room.
 
     Attributes:
-        room_id: The id of the room this event was recieved from.
-        room_name: The name of the room this event was recieved from.
+        room_id: The id of the room this event was received from.
+        room_name: The name of the room this event was received from.
     """
 
     room_id: int
@@ -256,7 +256,7 @@ class ReplyEvent(MessageEvent):
 class UserSuspendedEvent(UserEvent):
     """This account was suspended from chat.
     
-    This is usually not a good event to recieve. `user_id` and `user_name` will be the user id and username
+    This is usually not a good event to receive. `user_id` and `user_name` will be the user id and username
     of the moderator which created the suspension; `target_user_id` will be the user id of this account.
 
     Attributes:
@@ -280,7 +280,7 @@ class UnknownEvent(Event):
     """
     An undocumented event.
 
-    Instances of this class will have additional properties matching the JSON recieved by the library.
+    Instances of this class will have additional properties matching the JSON received by the library.
 
     Attributes:
         event_type: The type of the event.
