@@ -161,7 +161,7 @@ class MessageStarredEvent(BaseMessageEvent):
 
     `message_stars` and `message_owner_stars` will reflect the new star count and pin state of this message.
     This event no longer includes information about who starred or pinned the message;
-    see https://meta.stackexchange.com/q/229913/1116284.
+    see <https://meta.stackexchange.com/q/229913/1116284>.
     """
 
     event_type: Literal[EventType.MessageStarred]
@@ -189,21 +189,21 @@ class AccessLevelChangedEvent(UserEvent):
     `target_user_id` will be the user id of the user whose access level was changed.
 
     Known values for `content`:
-    - `Access now read-write`: The user was explicitly given write access. In gallery rooms, this allows
+    * `Access now read-write`: The user was explicitly given write access. In gallery rooms, this allows
         the user to chat. This level does nothing in public rooms, unless the user has less than
         20 network-wide reputation, in which case they may be granted this level by a moderator to override
         the reputation requirement.
-    - `Access now read-only`: The user was explicitly given read access. This level does nothing in public or gallery rooms,
+    * `Access now read-only`: The user was explicitly given read access. This level does nothing in public or gallery rooms,
         but allows the user to see private rooms (which can only be created by a moderator).
-    - `Access now owner`: The user was made a room owner.
-    - `Access now request`: The user requested access to a gallery room.
-    - `priv <number> created`: The user was kicked from the room. This may fire under other conditions as well;
+    * `Access now owner`: The user was made a room owner.
+    * `Access now request`: The user requested access to a gallery room.
+    * `priv <number> created`: The user was kicked from the room. This may fire under other conditions as well;
         TODO investigate this more.
-    - `priv <number> deleted`: The user's kickmute expired.
+    * `priv <number> deleted`: The user's kickmute expired.
 
     Attributes:
         content: A short string describing what change occured, which appears under certain conditions in
-            chat's UI. TODO: Investigate what those conditions are, see also https://meta.stackexchange.com/q/402787/1116284
+            chat's UI. TODO: Investigate what those conditions are, see also <https://meta.stackexchange.com/q/402787/1116284>
     """
 
     event_type: Literal[EventType.AccessLevelChanged]
@@ -213,9 +213,9 @@ class UserNotificationEvent(UserEvent):
     """One of several events occured which chat displays notifications for.
     
     Known actions which can fire this event:
-    - A user requesting access to a gallery room which this account owns. The triggering user will be
+    * A user requesting access to a gallery room which this account owns. The triggering user will be
         the user which requested access.
-    - A user being kicked from a room which this account owns. The triggering user will be Feeds (user -2).
+    * A user being kicked from a room which this account owns. The triggering user will be Feeds (user -2).
 
     `user_id` and `user_name will be the user id and username of the user which _triggered_ the event;
     `target_user_id` will be the user id of this account.
