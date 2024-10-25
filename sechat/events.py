@@ -159,9 +159,8 @@ class UserLeftEvent(UserEvent):
 class MessageStarredEvent(BaseMessageEvent):
     """Someone starred or pinned a message.
 
-    [`message_stars`][sechat.events.BaseMessageEvent.message_stars] and
-    [`message_owner_stars`][sechat.events.BaseMessageEvent.message_owner_stars] will reflect the new star count
-    and pin state of this message. This event no longer includes information about who starred or pinned the message;
+    `message_stars` and `message_owner_stars` will reflect the new star count and pin state of this message.
+    This event no longer includes information about who starred or pinned the message;
     see https://meta.stackexchange.com/q/229913/1116284.
     """
 
@@ -186,9 +185,8 @@ class DeleteEvent(BaseMessageEvent, UserEvent):
 class AccessLevelChangedEvent(UserEvent):
     """A user's access level was changed.
 
-    [`user_id`][sechat.events.UserEvent.user_id] and [`user_name`][sechat.events.UserEvent.user_name] will be the
-    user id and username of the user which performed the change; [`target_user_id`][sechat.events.UserEvent.target_user_id]
-    will be the user id of the user whose access level was changed.
+    `user_id` and `user_name` will be the user id and username of the user which performed the change;
+    `target_user_id` will be the user id of the user whose access level was changed.
 
     Known values for `content`:
     - `Access now read-write`: The user was explicitly given write access. In gallery rooms, this allows
@@ -219,9 +217,8 @@ class UserNotificationEvent(UserEvent):
         the user which requested access.
     - A user being kicked from a room which this account owns. The triggering user will be Feeds (user -2).
 
-    [`user_id`][sechat.events.UserEvent.user_id] and [`user_name`][sechat.events.UserEvent.user_name] will be the
-    user id and username of the user which _triggered_ the event; [`target_user_id`][sechat.events.UserEvent.target_user_id]
-    will be the user id of this account.
+    `user_id` and `user_name will be the user id and username of the user which _triggered_ the event;
+    `target_user_id` will be the user id of this account.
 
     Attributes:
         content: A snippet of HTML containing the human-readable invite message which would be shown as a notification
@@ -234,10 +231,9 @@ class UserNotificationEvent(UserEvent):
 class InvitationEvent(UserEvent):
     """Someone invited this account to a room.
 
-    [`room_id`][sechat.events.RoomEvent.room_id] and [`room_name`][sechat.events.RoomEvent.room_name] will be the
-    id and name of the room this account was invited to join. [`user_id`][sechat.events.UserEvent.user_id]
-    and [`user_name`][sechat.events.UserEvent.user_name] will be the user id and username of the user which
-    sent the invite; [`target_user_id`][sechat.events.UserEvent.target_user_id] will be the user id of this account.
+    `room_id` and `room_name`will be the id and name of the room this account was invited to join.
+    `user_id`and `user_name` will be the user id and username of the user which sent the invite.
+    `target_user_id` will be the user id of this account.
 
     Attributes:
         content: A snippet of HTML containing the human-readable invite message which would be shown as a notification
@@ -259,9 +255,8 @@ class ReplyEvent(MessageEvent):
 class UserSuspendedEvent(UserEvent):
     """This account was suspended from chat.
     
-    This is usually not a good event to recieve. [`user_id`][sechat.events.UserEvent.user_id]
-    and [`user_name`][sechat.events.UserEvent.user_name] will be the user id and username of the moderator which
-    created the suspension; [`target_user_id`][sechat.events.UserEvent.target_user_id] will be the user id of this account.
+    This is usually not a good event to recieve. `user_id` and `user_name` will be the user id and username
+    of the moderator which created the suspension; `target_user_id` will be the user id of this account.
 
     Attributes:
         content: A string containing an unknown number, then a space, then a JSON object with two keys: `old` and `new`.
@@ -275,8 +270,7 @@ class UserSuspendedEvent(UserEvent):
 class UserNameOrAvatarChangedEvent(UserEvent):
     """Someone's user details changed.
     
-    [`user_id`][sechat.events.UserEvent.user_id] will be -2 (Feeds); [`target_user_id`][sechat.events.UserEvent.target_user_id]
-    will be the id of the user whose details changed.
+    `user_id` will be -2 (Feeds); `target_user_id` will be the id of the user whose details changed.
     """
 
     event_type: Literal[EventType.UserNameOrAvatarChanged]
