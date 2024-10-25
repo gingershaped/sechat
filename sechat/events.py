@@ -87,13 +87,25 @@ class RoomEvent(Event):
     room_name: str
 
 
-class BaseMessageEvent(RoomEvent):
+class UserEvent(RoomEvent):
+    """An event with user information.
+
+    Attributes:
+        user_id: The id of the user who triggered this event.
+        user_name: The username of the user who sent the message.
+        target_user_id: The id of the user targeted by this event.
+    """
+
+    user_id: int
+    user_name: str
+    target_user_id: Optional[int] = None
+
+
+class BaseMessageEvent(UserEvent):
     """An action taken on a message.
 
     Attributes:
         message_id: The id of the message.
-        user_id: The id of the user who triggered this event.
-        user_name: The username of the user who sent the message.
         parent_id: Either the id of the message this message is replying to, or the id of the last message sent by the
             user this message mentions. This will be `None` if the message doesn't reply to another message
             or doesn't ping exactly one user.
@@ -108,12 +120,8 @@ class BaseMessageEvent(RoomEvent):
     """
 
     message_id: int
-    user_id: int
-    user_name: str
-
     parent_id: Optional[int] = None
     show_parent: Optional[bool] = None
-    target_user_id: Optional[int] = None
 
     message_stars: int = 0
     message_owner_stars: int = 0
@@ -135,6 +143,18 @@ class EditEvent(MessageEvent):
     """A message was edited."""
 
     event_type: Literal[EventType.MessageEdited]
+
+
+class UserEnteredEvent(UserEvent):
+    """A user joined this room."""
+
+    event_type: Literal[EventType.UserEntered]
+
+
+class UserLeftEvent(UserEvent):
+    """A user left this room."""
+
+    event_type: Literal[EventType.UserLeft]
 
 
 class MentionEvent(MessageEvent):
@@ -175,7 +195,7 @@ class UnknownEvent(Event):
     model_config = ConfigDict(extra="allow")
 
 
-Events = MessageEvent | EditEvent | MentionEvent | DeleteEvent | ReplyEvent
+Events = MessageEvent | EditEvent | UserEnteredEvent | UserLeftEvent | MentionEvent | DeleteEvent | ReplyEvent
 EventAdapter = TypeAdapter[Event](
     Annotated[Events, Field(discriminator="event_type")] | UnknownEvent
 )
