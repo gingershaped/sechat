@@ -12,7 +12,8 @@ class EventType(IntEnum):
         MessageEdited: A message was edited.
         UserEntered: A user joined the room.
         UserLeft: A user left the room.
-        RoomNameChanged: The room's visibility, name, tags, or description were changed.
+        RoomNameChanged: The room's visibility, name, tags, or description were changed. This event does not appear
+            to actually fire.
         MessageStarred: A user starred a message.
         DebugMessage: Unknown. `master-chat.js` does not send or handle DEBUG events, and there is no known way to send
             them manually; however, they have appeared in GDPR datadumps containing information about room edits.
@@ -31,9 +32,10 @@ class EventType(IntEnum):
         MessageReply: Someone replied to a message sent by this account.
         MessageMovedOut: A message was moved out of this room.
         MessageMovedIn: A message was moved into this room.
-        TimeBreak: This room was placed in timeout by a room owner or moderator.
+        TimeBreak: This room was placed in timeout by a room owner or moderator. This event does not appear
+            to actually fire.
         FeedTicker: An RSS feed in ticker mode recieved a new event.
-        UserSuspended: A user was suspended? Details unknown.
+        UserSuspended: This account was suspended.
         UserMerged: User accounts were merged? Details unknown.
         UserNameOrAvatarChanged: A user's name or avatar was changed.
     """
@@ -189,9 +191,14 @@ class AccessLevelChangedEvent(UserEvent):
     will be the user id of the user whose access level was changed.
 
     Known values for `content`:
-    - `Access now read-write`: The user was explicitly given write access
-    - `Access now read-only`: The user was explicitly given read access, such as for a private room
-    - `Access now request`: The user requested access to a gallery room
+    - `Access now read-write`: The user was explicitly given write access. In gallery rooms, this allows
+        the user to chat. This level does nothing in public rooms, unless the user has less than
+        20 network-wide reputation, in which case they may be granted this level by a moderator to override
+        the reputation requirement.
+    - `Access now read-only`: The user was explicitly given read access. This level does nothing in public or gallery rooms,
+        but allows the user to see private rooms (which can only be created by a moderator).
+    - `Access now owner`: The user was made a room owner.
+    - `Access now request`: The user requested access to a gallery room.
     - `priv <number> created`: The user was kicked from the room. This may fire under other conditions as well;
         TODO investigate this more.
     - `priv <number> deleted`: The user's kickmute expired.
