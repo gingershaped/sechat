@@ -19,7 +19,7 @@ mkdocstrings-python = {version = "^1.12.2", optional = true}
 mkdocs-material = {version = "^9.5.42", optional = true}
 
 [tool.poetry.group.dev.dependencies]
-black = {version = "^23.1.0", allow-prereleases = true}
+black = {version = ">=23.1,<25.0", allow-prereleases = true}
 
 [tool.poetry.extras]
 docs = ["mkdocs", "mkdocstrings", "mkdocstrings-python", "mkdocs-material"]
