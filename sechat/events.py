@@ -25,7 +25,7 @@ class EventType(IntEnum):
             one point to upload arbitrary files to chat; this may be a relic from that feature.
         ModeratorFlag: A moderator flag was raised. Details unknown since normal users don't receive this.
         UserSettingsChanged: This account's chat settings (such as muted users) were changed.
-        GlobalNotification: Unknown.
+        GlobalNotification: One of several events happened which shows a notification in the client.
         AccessLevelChanged: This account's access level was changed.
         UserNotification: One of several events happened which shows a notification in the client.
         Invitation: Someone invited this account to a room.
@@ -214,6 +214,7 @@ class UserNotificationEvent(UserEvent):
     """One of several events occured which chat displays notifications for.
     
     Known actions which can fire this event:
+
     * A user requesting access to a gallery room which this account owns. The triggering user will be
         the user which requested access.
     * A user being kicked from a room which this account owns. The triggering user will be Feeds (user -2).
@@ -242,6 +243,27 @@ class InvitationEvent(UserEvent):
     """
 
     event_type: Literal[EventType.Invitation]
+    content: str
+
+class GlobalNotificationEvent(UserEvent):
+    """One of several events occured which chat displays notifications for.
+
+    This event seems similar to []`UserNotification`][sechat.events.UserNotification], and the default client
+    handles them identically; the distinction, if any, is unknown.
+
+    Known actions which can fire this event:
+
+    * A scheduled event starting soon.
+    * A chat developer manually sending a notification.
+
+    `user_id` will always be -2 (Feeds); `target_user_id` will be the id of this account.
+    
+    Attributes:
+        content: A snippet of HTML containing the human-readable invite message which would be shown as a notification
+            in the chat client.
+    """
+
+    event_type: Literal[EventType.GlobalNotification]
     content: str
 
 
@@ -301,6 +323,7 @@ Events = (
     | AccessLevelChangedEvent
     | UserNotificationEvent
     | InvitationEvent
+    | GlobalNotificationEvent
     | ReplyEvent
     | UserSuspendedEvent
     | UserNameOrAvatarChangedEvent
