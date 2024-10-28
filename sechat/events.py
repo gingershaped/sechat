@@ -32,8 +32,7 @@ class EventType(IntEnum):
         MessageReply: Someone replied to a message sent by this account.
         MessageMovedOut: A message was moved out of this room.
         MessageMovedIn: A message was moved into this room.
-        TimeBreak: This room was placed in timeout by a room owner or moderator. This event does not appear
-            to actually fire.
+        TimeBreak: Unknown.
         FeedTicker: An RSS feed in ticker mode received a new event.
         UserSuspended: This account was suspended.
         UserMerged: User accounts were merged? Details unknown.
@@ -155,6 +154,19 @@ class UserLeftEvent(UserEvent):
 
     event_type: Literal[EventType.UserLeft]
 
+class RoomNameChangedEvent(UserEvent):
+    """This room's name, description, or tags were changed.
+
+    The `room_name` property will reflect the new name of this room, if its name was changed. `user_id` and `user_name`
+    will be the id and name of the user who performed the change.
+    
+    Attributes:
+        content: The new name and description of the room, separated by ` / `.
+    """
+
+    event_type: Literal[EventType.RoomNameChanged]
+    content: str
+
 
 class MessageStarredEvent(BaseMessageEvent):
     """Someone starred or pinned a message.
@@ -183,7 +195,7 @@ class DeleteEvent(BaseMessageEvent, UserEvent):
 
 
 class AccessLevelChangedEvent(UserEvent):
-    """A user's access level was changed.
+    """A user or room's access level was changed.
 
     `user_id` and `user_name` will be the user id and username of the user which performed the change;
     `target_user_id` will be the user id of the user whose access level was changed.
@@ -201,14 +213,16 @@ class AccessLevelChangedEvent(UserEvent):
     * `priv <number> created`: The user was kicked from the room. This may fire under other conditions as well;
         TODO investigate this more.
     * `priv <number> deleted`: The user's kickmute expired.
+    * `None` (not the string "None"): The room's access level was changed. `target_user_id` will be `None`.
 
     Attributes:
         content: A short string describing what change occured, which appears under certain conditions in
             chat's UI. TODO: Investigate what those conditions are, see also <https://meta.stackexchange.com/q/402787/1116284>
+            If the room's access level was changed (such as from public to gallery), this will be `None`.
     """
 
     event_type: Literal[EventType.AccessLevelChanged]
-    content: str
+    content: Optional[str] = None
 
 class UserNotificationEvent(UserEvent):
     """One of several events occured which chat displays notifications for.
