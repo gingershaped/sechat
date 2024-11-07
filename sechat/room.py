@@ -95,7 +95,7 @@ class Room:
                 else:
                     suppressed_errors.clear()
 
-                async with response:
+                async with response as response:
                     if (
                         payload := cast(dict, await response.json()).get(f"r{room_id}")
                     ) is None:
