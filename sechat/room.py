@@ -54,7 +54,11 @@ class Room:
 
     @staticmethod
     async def anonymous(
-        room_id: int, *, server: Server = Server.STACK_EXCHANGE, poll_interval: int = 2
+        room_id: int,
+        *,
+        server: Server = Server.STACK_EXCHANGE,
+        poll_interval: int = 2,
+        retries: int = 5,
     ) -> AsyncGenerator[Event, None]:
         """Anonymously poll for events in a room. This method does not require any authentication.
 
@@ -63,9 +67,11 @@ class Room:
             server: The chat server of the room. Room ids are only unique to a single chat server.
             poll_interval: The interval at which new events should be checked, in seconds.
                 It is not recommended to change this value.
+            retries: The number of consecutive request errors to ignore before crashing.
         Yields:
             A sequence of [sechat.events.Event][]s which occur in the room.
         """
+        logger = getLogger(__name__).getChild(str(room_id))
         async with ClientSession(server) as session:
             fkey = await Credentials._scrape_fkey(session)
             async with session.post(
@@ -73,10 +79,23 @@ class Room:
                 data={"since": 0, "mode": "Messages", "msgCount": 100, "fkey": fkey},
             ) as response:
                 last_time = (await response.json())["time"]
+            suppressed_errors: list[Exception] = []
             while True:
-                async with session.post(
-                    "/events", data={f"r{room_id}": last_time, "fkey": fkey}
-                ) as response:
+                try:
+                    response = session.post(
+                        "/events", data={f"r{room_id}": last_time, "fkey": fkey}
+                    )
+                except Exception as e:
+                    suppressed_errors.append(e)
+                    if len(suppressed_errors) > retries:
+                        raise ExceptionGroup(f"Failed to poll {retries} times in a row", suppressed_errors)
+                    delay = len(suppressed_errors) * 10
+                    logger.warning(f"An error occured while fetching data ({len(suppressed_errors)}/{retries}), retrying in {delay} seconds", exc_info=e)
+                    await sleep(delay)
+                else:
+                    suppressed_errors.clear()
+
+                async with response:
                     if (
                         payload := cast(dict, await response.json()).get(f"r{room_id}")
                     ) is None:
