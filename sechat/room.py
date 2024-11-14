@@ -57,7 +57,7 @@ class Room:
         room_id: int,
         *,
         server: Server = Server.STACK_EXCHANGE,
-        poll_interval: int = 2,
+        poll_interval: int = 3,
         retries: int = 5,
     ) -> AsyncGenerator[Event, None]:
         """Anonymously poll for events in a room. This method does not require any authentication.
