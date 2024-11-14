@@ -81,10 +81,10 @@ class Room:
                 last_time = (await response.json())["time"]
             suppressed_errors: list[Exception] = []
             while True:
+                payload = None
                 try:
-                    response = session.post(
-                        "/events", data={f"r{room_id}": last_time, "fkey": fkey}
-                    )
+                    async with session.post("/events", data={f"r{room_id}": last_time, "fkey": fkey}) as response:
+                        payload = cast(dict, await response.json()).get(f"r{room_id}")
                 except Exception as e:
                     suppressed_errors.append(e)
                     if len(suppressed_errors) > retries:
@@ -94,17 +94,13 @@ class Room:
                     await sleep(delay)
                 else:
                     suppressed_errors.clear()
-
-                async with response as response:
-                    if (
-                        payload := cast(dict, await response.json()).get(f"r{room_id}")
-                    ) is None:
-                        continue
-                    if "t" in payload:
-                        last_time = payload["t"]
-                    if "e" in payload:
-                        for event_data in payload["e"]:
-                            yield EventAdapter.validate_python(event_data)
+                if payload is None:
+                    continue
+                if "t" in payload:
+                    last_time = payload["t"]
+                if "e" in payload:
+                    for event_data in payload["e"]:
+                        yield EventAdapter.validate_python(event_data)
                 await sleep(poll_interval)
 
     def __init__(self, room_id: int, user_id: int, session: ClientSession, fkey: str):
