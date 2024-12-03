@@ -1,6 +1,6 @@
 import json
-from pprint import pformat
 import re
+from pprint import pformat
 from asyncio import sleep
 from functools import partialmethod
 from logging import getLogger
@@ -8,6 +8,7 @@ from time import monotonic, time
 from typing import Any, AsyncGenerator, Optional, cast
 
 from aiohttp import ClientSession
+from aiohttp.client_exceptions import WSMessageTypeError
 from backoff import on_exception, runtime
 from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
@@ -164,6 +165,8 @@ class Room:
                             message = cast(
                                 dict, await connection.receive_json(timeout=45)
                             )
+                        except WSMessageTypeError:
+                            break
                         except Exception as e:
                             self._logger.warning(
                                 "An exception occured while receiving data:", exc_info=e
