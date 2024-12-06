@@ -35,6 +35,7 @@ class Room:
     Attributes:
         room_id: The unique id of this room.
         user_id: The unique id of the bot user.
+        server: The chat instance this room belongs to.
     """
 
     @staticmethod
@@ -51,7 +52,7 @@ class Room:
         """
         session = credentials._session()
         fkey = await Credentials._scrape_fkey(session)
-        return Room(room_id, credentials.user_id, session, fkey)
+        return Room(room_id, credentials.user_id, credentials.server, session, fkey)
 
     @staticmethod
     async def anonymous(
@@ -84,14 +85,22 @@ class Room:
             while True:
                 payload = None
                 try:
-                    async with session.post("/events", data={f"r{room_id}": last_time, "fkey": fkey}) as response:
+                    async with session.post(
+                        "/events", data={f"r{room_id}": last_time, "fkey": fkey}
+                    ) as response:
                         payload = cast(dict, await response.json()).get(f"r{room_id}")
                 except Exception as e:
                     suppressed_errors.append(e)
                     if len(suppressed_errors) > retries:
-                        raise ExceptionGroup(f"Failed to poll {retries} times in a row", suppressed_errors)
+                        raise ExceptionGroup(
+                            f"Failed to poll {retries} times in a row",
+                            suppressed_errors,
+                        )
                     delay = len(suppressed_errors) * 10
-                    logger.warning(f"An error occured while fetching data ({len(suppressed_errors)}/{retries}), retrying in {delay} seconds", exc_info=e)
+                    logger.warning(
+                        f"An error occured while fetching data ({len(suppressed_errors)}/{retries}), retrying in {delay} seconds",
+                        exc_info=e,
+                    )
                     await sleep(delay)
                 else:
                     suppressed_errors.clear()
@@ -104,9 +113,17 @@ class Room:
                         yield EventAdapter.validate_python(event_data)
                 await sleep(poll_interval)
 
-    def __init__(self, room_id: int, user_id: int, session: ClientSession, fkey: str):
+    def __init__(
+        self,
+        room_id: int,
+        user_id: int,
+        server: Server,
+        session: ClientSession,
+        fkey: str,
+    ):
         self.room_id = room_id
         self.user_id = user_id
+        self.server = server
         self._logger = getLogger(__name__).getChild(str(room_id))
         self._session = session
         self._fkey = fkey
