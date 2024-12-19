@@ -15,8 +15,6 @@ from sechat.servers import Server
 if TYPE_CHECKING:
     from _typeshed import FileDescriptorOrPath
 
-LOGIN_HOST = URL("https://meta.stackexchange.com")
-COOKIE_ROOT = "stackexchange.com"
 USER_AGENT = "Mozilla/5.0 (compatible; sechat/2.0.0; +https://pypi.org/project/sechat)"
 logger = getLogger(__name__)
 
@@ -96,9 +94,11 @@ class Credentials:
 
         logger.info(f"Logging into {server}")
         chat_user_cookie = "sechatusr" if server == Server.STACK_EXCHANGE else "chatusr"
+        login_host = "https://stackoverflow.com" if server == Server.STACK_OVERFLOW else "https://meta.stackexchange.com"
+        cookie_root = "https://stackoverflow.com" if server == Server.STACK_OVERFLOW else "https://stackexchange.com"
 
         async with ClientSession(
-            LOGIN_HOST, headers={"User-Agent": USER_AGENT}
+            login_host, headers={"User-Agent": USER_AGENT}
         ) as qa_session:
             async with qa_session.get("/users/login") as response:
                 response.raise_for_status()
@@ -146,9 +146,9 @@ class Credentials:
                     raise LoginError(
                         f"Login failed! Redirected to {redirect_target}; caught by captcha?"
                     )
-                logger.debug(f"Logged in to {LOGIN_HOST}")
+                logger.debug(f"Logged in to {login_host}")
 
-        qa_cookies = cast(CookieJar, qa_session.cookie_jar)._cookies[(COOKIE_ROOT, "")]
+        qa_cookies = cast(CookieJar, qa_session.cookie_jar)._cookies[(cookie_root, "")]
         acct = qa_cookies["acct"]
         prov = qa_cookies["prov"]
 
@@ -157,7 +157,7 @@ class Credentials:
         ) as chat_session:
             chat_session.cookie_jar.update_cookies(
                 cookies={"acct": acct, "prov": prov},
-                response_url=URL.build(scheme="https", host=COOKIE_ROOT),
+                response_url=URL.build(scheme="https", host=cookie_root),
             )
             async with chat_session.get("/") as response:
                 response.raise_for_status()
