@@ -380,3 +380,13 @@ class Room:
             slug: The slug of the conversation to delete.
         """
         await self._ok_request(f"/conversation/delete/{self.room_id}/{slug}")
+
+    async def edit_bio(self, bio: str) -> None:
+        """Update the account's bio.
+        
+        The maximum length is 200 characters, anything longer will be truncated.
+        
+        Parameters:
+            message: The new bio text.
+        """
+        await self._request(f"/users/usermessage/{self.user_id}", {"message": bio})
