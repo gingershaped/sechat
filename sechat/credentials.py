@@ -94,8 +94,16 @@ class Credentials:
 
         logger.info(f"Logging into {server}")
         chat_user_cookie = "sechatusr" if server == Server.STACK_EXCHANGE else "chatusr"
-        login_host = "https://stackoverflow.com" if server == Server.STACK_OVERFLOW else "https://meta.stackexchange.com"
-        cookie_root = "stackoverflow.com" if server == Server.STACK_OVERFLOW else "stackexchange.com"
+        login_host = (
+            "https://stackoverflow.com"
+            if server == Server.STACK_OVERFLOW
+            else "https://meta.stackexchange.com"
+        )
+        cookie_root = (
+            "stackoverflow.com"
+            if server == Server.STACK_OVERFLOW
+            else "stackexchange.com"
+        )
 
         async with ClientSession(
             login_host, headers={"User-Agent": USER_AGENT}

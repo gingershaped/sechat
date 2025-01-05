@@ -1,29 +1,24 @@
-import json
-import re
 from pprint import pformat
 from asyncio import sleep
-from functools import partialmethod
 from logging import getLogger
 from time import monotonic, time
-from typing import Any, AsyncGenerator, Optional, cast
+from typing import AsyncGenerator, Optional, cast
 
 from aiohttp import ClientSession
 from aiohttp.client_exceptions import WSMessageTypeError
-from backoff import on_exception, runtime
-from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
 from yarl import URL
 
+from sechat.client import ChatClient
 from sechat.credentials import Credentials
-from sechat.errors import OperationFailedError, RatelimitError
+from sechat.errors import OperationFailedError
 from sechat.events import Event, EventAdapter, MentionEvent, ReplyEvent
 from sechat.servers import Server
 
 RESET_INTERVAL = 60 * 60 * 2
-BACKOFF_RESPONSE = re.compile(r"You can perform this action again in (\d+) seconds?\.")
 
 
-class Room:
+class Room(ChatClient):
     """A chatroom that a bot is in.
 
     This class should ideally be used as a context manager; if it is not, ensure that
@@ -34,25 +29,19 @@ class Room:
         Do not directly construct this class; use [`join`][sechat.Room.join] instead.
     Attributes:
         room_id: The unique id of this room.
-        user_id: The unique id of the bot user.
-        server: The chat instance this room belongs to.
     """
 
     @staticmethod
-    async def join(credentials: Credentials, room_id: int) -> "Room":
+    def join(credentials: Credentials, room_id: int):
         """Join a room.
-
-        This function returns a `Room` instance, and is designed for use in a context manager.
 
         Parameters:
             credentials: The credentials for the account to join the room with.
             room_id: The id of the room to join.
         Returns:
-            A new `Room` instance which may be used to interact with the room.
+            A context manager which provides a `Room` instance when entered.
         """
-        session = credentials._session()
-        fkey = await Credentials._scrape_fkey(session)
-        return Room(room_id, credentials.user_id, credentials.server, session, fkey)
+        return ChatClient.ContextManager(Room, credentials, room_id)
 
     @staticmethod
     async def anonymous(
@@ -115,29 +104,20 @@ class Room:
 
     def __init__(
         self,
-        room_id: int,
-        user_id: int,
-        server: Server,
         session: ClientSession,
         fkey: str,
+        user_id: int,
+        server: Server,
+        room_id: int,
     ):
+        super().__init__(session, fkey, user_id, server)
         self.room_id = room_id
-        self.user_id = user_id
-        self.server = server
         self._logger = getLogger(__name__).getChild(str(room_id))
-        self._session = session
-        self._fkey = fkey
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        await self.close()
 
     async def close(self) -> None:
         """Close this room, releasing the underlying [aiohttp.ClientSession][] and visually leaving the room for other users."""
         await self._request(f"/chats/leave/{self.room_id}", {"quiet": "true"})
-        await self._session.close()
+        await super().close()
 
     async def _socket_urls(self):
         while True:
@@ -210,37 +190,6 @@ class Room:
                                         "/messages/ack", {"id": str(event.message_id)}
                                     )
                                 yield event
-
-    @on_exception(runtime, RatelimitError, value=lambda e: e.retry_after, jitter=None)
-    async def _request(self, url: str, data: dict[str, Any] = {}):
-        async with self._session.post(
-            url, data=data | {"fkey": self._fkey}
-        ) as response:
-            text = await response.text()
-            match response.status:
-                case 409:
-                    if (match := BACKOFF_RESPONSE.fullmatch(text)) is None:
-                        self._logger.warning(f"Got 409 with malformed response: {text}")
-                        raise RatelimitError(1)
-                    raise RatelimitError(int(match.group(1)))
-                case 200:
-                    return text
-                case _:
-                    raise OperationFailedError(
-                        f"Got non-ok status code {response.status} ({response.reason})",
-                        text,
-                    )
-
-    async def _json_request(self, url: str, data: dict[str, Any] = {}):
-        response = await self._request(url, data)
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError as e:
-            raise OperationFailedError("Failed to decode response", response) from e
-
-    async def _ok_request(self, url: str, data: dict[str, Any] = {}):
-        if (response := await self._json_request(url, data)) != "ok":
-            raise OperationFailedError(f"received non-ok response", response)
 
     async def send(self, message: str, reply_to: Optional[int] = None) -> int:
         """Send a message.
@@ -380,13 +329,3 @@ class Room:
             slug: The slug of the conversation to delete.
         """
         await self._ok_request(f"/conversation/delete/{self.room_id}/{slug}")
-
-    async def edit_bio(self, bio: str) -> None:
-        """Update the account's bio.
-        
-        The maximum length is 200 characters, anything longer will be truncated.
-        
-        Parameters:
-            message: The new bio text.
-        """
-        await self._request(f"/users/usermessage/{self.user_id}", {"message": bio})

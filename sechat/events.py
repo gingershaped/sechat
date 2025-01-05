@@ -154,12 +154,13 @@ class UserLeftEvent(UserEvent):
 
     event_type: Literal[EventType.UserLeft]
 
+
 class RoomNameChangedEvent(UserEvent):
     """This room's name, description, or tags were changed.
 
     The `room_name` property will reflect the new name of this room, if its name was changed. `user_id` and `user_name`
     will be the id and name of the user who performed the change.
-    
+
     Attributes:
         content: The new name and description of the room, separated by ` / `.
     """
@@ -201,7 +202,7 @@ class AccessLevelChangedEvent(UserEvent):
     `target_user_id` will be the user id of the user whose access level was changed.
 
     Known values for `content`:
-    
+
     * `Access now read-write`: The user was explicitly given write access. In gallery rooms, this allows
         the user to chat. This level does nothing in public rooms, unless the user has less than
         20 network-wide reputation, in which case they may be granted this level by a moderator to override
@@ -224,9 +225,10 @@ class AccessLevelChangedEvent(UserEvent):
     event_type: Literal[EventType.AccessLevelChanged]
     content: Optional[str] = None
 
+
 class UserNotificationEvent(UserEvent):
     """One of several events occured which chat displays notifications for.
-    
+
     Known actions which can fire this event:
 
     * A user requesting access to a gallery room which this account owns. The triggering user will be
@@ -244,6 +246,7 @@ class UserNotificationEvent(UserEvent):
     event_type: Literal[EventType.UserNotification]
     content: str
 
+
 class InvitationEvent(UserEvent):
     """Someone invited this account to a room.
 
@@ -259,6 +262,7 @@ class InvitationEvent(UserEvent):
     event_type: Literal[EventType.Invitation]
     content: str
 
+
 class GlobalNotificationEvent(UserEvent):
     """One of several events occured which chat displays notifications for.
 
@@ -271,7 +275,7 @@ class GlobalNotificationEvent(UserEvent):
     * A chat developer manually sending a notification.
 
     `user_id` will always be -2 (Feeds); `target_user_id` will be the id of this account.
-    
+
     Attributes:
         content: A snippet of HTML containing the human-readable invite message which would be shown as a notification
             in the chat client.
@@ -289,9 +293,10 @@ class ReplyEvent(MessageEvent):
 
     event_type: Literal[EventType.MessageReply]
 
+
 class UserSuspendedEvent(UserEvent):
     """This account was suspended from chat.
-    
+
     This is usually not a good event to receive. `user_id` and `user_name` will be the user id and username
     of the moderator which created the suspension; `target_user_id` will be the user id of this account.
 
@@ -304,13 +309,15 @@ class UserSuspendedEvent(UserEvent):
     event_type: Literal[EventType.UserSuspended]
     content: str
 
+
 class UserNameOrAvatarChangedEvent(UserEvent):
     """Someone's user details changed.
-    
+
     `user_id` will be -2 (Feeds); `target_user_id` will be the id of the user whose details changed.
     """
 
     event_type: Literal[EventType.UserNameOrAvatarChanged]
+
 
 class UnknownEvent(Event):
     """

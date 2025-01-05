@@ -11,3 +11,4 @@ site/
 dist/
 .vscode/
 /*.py
+/*.dat
