@@ -1,11 +1,14 @@
+from io import BytesIO
 from pprint import pformat
 from asyncio import sleep
 from logging import getLogger
+import re
 from time import monotonic, time
 from typing import AsyncGenerator, Optional, cast
 
 from aiohttp import ClientSession
 from aiohttp.client_exceptions import WSMessageTypeError
+from bs4 import BeautifulSoup, Tag
 from pydantic import ValidationError
 from yarl import URL
 
@@ -329,3 +332,30 @@ class Room(ChatClient):
             slug: The slug of the conversation to delete.
         """
         await self._ok_request(f"/conversation/delete/{self.room_id}/{slug}")
+
+    async def upload_image(self, image: BytesIO, filename: str = "upload") -> str:
+        """Upload an image to Stack Exchange's image hosting.
+        
+        Parameters:
+            image: The image data to upload.
+            filename: The filename supplied to Stack Exchange.
+                It is unknown if this parameter is used by anything.
+        Returns:
+            The URL of the uploaded image.
+        """
+
+        response = await self._session.post("/upload/image", data={"filename": image, "shadow-filename": filename})
+        soup = BeautifulSoup(await response.read(), features="lxml")
+        assert isinstance(script := soup.find("script"), Tag)
+        
+        try:
+            error_line, result_line, *_ = map(str.strip, script.get_text().strip().splitlines())
+        except ValueError:
+            raise OperationFailedError("Malformed response", await response.text()) from None
+        error = re.match(r"var error = (?:'(.*)'|null);", error_line)
+        result = re.match(r"var result = '(.*)';", result_line)
+        if error is None or result is None:
+            raise OperationFailedError("Malformed response", await response.text())
+        if error.group(1) != None:
+            raise OperationFailedError(f"Upload failed: {error.group(1)}")
+        return cast(str, result.group(1))
